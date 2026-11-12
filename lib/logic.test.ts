@@ -1,0 +1,56 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { gradeLead } from "./grade.ts";
+import { deriveEngagement } from "./ghl.ts";
+import type { Client } from "./types.ts";
+
+const client: Client = {
+  id: "c", name: "T", active: true, ghl_location_id: "", ghl_token: null, target_zips: ["80202"],
+  center_address: "Denver", center_lat: 39.7392, center_lng: -104.9903, radius_miles: 20,
+  min_sqft: 1400, max_sqft: 5000, allowed_property_types: ["Single Family"], notes: null,
+  last_synced_at: null, last_sync_error: null, created_at: "",
+};
+const home = { property_status: "found" as const, address: "1 Main", lat: 39.75, lng: -104.98, zip: "80203", sqft: 2200, property_type: "Single Family" };
+
+test("good home in radius", () => assert.equal(gradeLead(client, home).grade, "good"));
+test("too small", () => assert.match(gradeLead(client, { ...home, sqft: 900 }).reasons[0], /too small/));
+test("too large", () => assert.equal(gradeLead(client, { ...home, sqft: 9000 }).grade, "bad"));
+test("condo rejected", () => assert.equal(gradeLead(client, { ...home, property_type: "Condo" }).grade, "bad"));
+test("out of radius but listed zip is in", () =>
+  assert.equal(gradeLead(client, { ...home, lat: 40.6, lng: -105.1, zip: "80202" }).grade, "good"));
+test("out of radius and zip", () => assert.equal(gradeLead(client, { ...home, lat: 40.6, lng: -105.1 }).grade, "bad"));
+test("no address -> review", () => assert.equal(gradeLead(client, { ...home, address: null, property_status: "no_address" }).grade, "review"));
+test("not in records but in area -> review", () =>
+  assert.equal(gradeLead(client, { ...home, property_status: "not_found", sqft: null, property_type: null }).grade, "review"));
+test("not in records and out of area -> bad", () =>
+  assert.equal(gradeLead(client, { ...home, property_status: "not_found", sqft: null, lat: 41, lng: -106 }).grade, "bad"));
+
+const t = (m: number) => new Date(Date.UTC(2026, 0, 1, 12, m)).toISOString();
+test("workflow texts alone don't count as client reply", () => {
+  const e = deriveEngagement([
+    { direction: "outbound", messageType: "TYPE_SMS", dateAdded: t(0), source: "workflow" },
+    { direction: "inbound", messageType: "TYPE_SMS", dateAdded: t(5) },
+    { direction: "outbound", messageType: "TYPE_SMS", dateAdded: t(6), source: "workflow" },
+  ], []);
+  assert.equal(e.responsive, true);
+  assert.equal(e.client_responded, false);
+});
+test("human reply after lead reply counts", () => {
+  const e = deriveEngagement([
+    { direction: "inbound", messageType: "TYPE_SMS", dateAdded: t(5) },
+    { direction: "outbound", messageType: "TYPE_SMS", dateAdded: t(20), source: "app", userId: "u1" },
+  ], []);
+  assert.equal(e.client_responded, true);
+  assert.equal(e.first_response_at, t(20));
+});
+test("answered outbound call = responsive + client responded", () => {
+  const e = deriveEngagement([
+    { direction: "outbound", messageType: "TYPE_CALL", dateAdded: t(3), status: "completed", userId: "u1", meta: { call: { duration: 120, status: "completed" } } },
+  ], []);
+  assert.deepEqual([e.responsive, e.client_responded], [true, true]);
+});
+test("form activity is not a reply; cancelled appt not booked", () => {
+  const e = deriveEngagement([{ direction: "inbound", messageType: "TYPE_ACTIVITY_CONTACT", dateAdded: t(0) }],
+    [{ startTime: t(100), appointmentStatus: "cancelled" }]);
+  assert.deepEqual([e.responsive, e.booked], [false, false]);
+});
