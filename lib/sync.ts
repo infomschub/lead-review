@@ -13,7 +13,7 @@ async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
   }));
 }
 
-/** Pull last-7-day leads from GHL, look up new addresses, refresh engagement, grade. */
+/** Pull last-7-day leads from GHL, measure roof or home, refresh engagement, grade. */
 export async function syncClient(client: Client): Promise<{ leads: number; error?: string }> {
   const s = store();
 
@@ -42,20 +42,20 @@ export async function syncClient(client: Client): Promise<{ leads: number; error
         updated_at: new Date().toISOString(),
       };
 
-      // Property: once per address (cached), retry on previous errors or address changes.
-      const addrChanged = prev && addressKey(prev) !== addressKey(c);
+      // Size lookup: once per address per company type (cached), retried if the last try errored.
       if (!c.address) {
-        Object.assign(row, { property_status: "no_address", sqft: null, property_type: null, lat: null, lng: null });
-      } else if (!prev || addrChanged || prev.property_status === "error" || prev.property_status === "pending") {
-        const key = addressKey(c);
+        Object.assign(row, { property_status: "no_address", sqft: null, roof_sqft: null, property_type: null, lat: null, lng: null });
+      } else {
+        const key = `${client.company_type}:${addressKey(c)}`;
         let p = await s.getCachedProperty(key);
         if (!p || p.status === "error") {
-          p = await lookupProperty(fullAddress(c));
+          p = await lookupProperty(fullAddress(c), client.company_type);
           if (p.status !== "error") await s.cacheProperty(key, p);
         }
         Object.assign(row, {
           property_status: p.status, formatted_address: p.formatted_address, lat: p.lat, lng: p.lng,
           sqft: p.sqft, property_type: p.property_type, year_built: p.year_built,
+          roof_sqft: p.roof_sqft, roof_pitch: p.roof_pitch, size_source: p.size_source,
           zip: c.zip || p.zip,
         });
       }

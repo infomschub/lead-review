@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { saveClient, testGhl } from "@/app/actions";
-import { PROPERTY_TYPES, type Client } from "@/lib/types";
+import { PROPERTY_TYPES, type Client, type CompanyType } from "@/lib/types";
 
 export type SafeClient = Omit<Client, "ghl_token"> & { hasToken: boolean };
 
@@ -12,7 +12,9 @@ export function ClientForm({ client }: { client?: SafeClient }) {
   const [token, setToken] = useState("");
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, startTest] = useTransition();
-  const types = client?.allowed_property_types ?? ["Single Family", "Townhouse"];
+  const types = client?.allowed_property_types?.length ? client.allowed_property_types : ["Single Family", "Townhouse"];
+  const [kind, setKind] = useState<CompanyType>(client?.company_type ?? "roofing");
+  const roofing = kind === "roofing";
 
   return (
     <form action={action} className="space-y-6">
@@ -27,9 +29,27 @@ export function ClientForm({ client }: { client?: SafeClient }) {
           </div>
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" name="active" defaultChecked={client?.active ?? true} className="h-4 w-4" />
-            Active (synced daily and shown on the overview)
+            Active (checked every Monday and shown on the overview)
           </label>
         </div>
+        <fieldset>
+          <legend className="label">Company type</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {([
+              ["roofing", "Roofing", "Judged on roof size, measured from Google satellite data."],
+              ["home_improvement", "Home improvement", "Judged on home size and property type, scraped from Redfin and Zillow."],
+            ] as const).map(([value, title, desc]) => (
+              <label
+                key={value}
+                className={`cursor-pointer rounded-lg border p-3 ${kind === value ? "border-brand bg-brand-soft" : "border-stone-300 hover:bg-stone-50"}`}
+              >
+                <input type="radio" name="company_type" value={value} checked={kind === value} onChange={() => setKind(value)} className="sr-only" />
+                <span className="block text-sm font-semibold">{title}</span>
+                <span className="block text-xs text-stone-600">{desc}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </section>
 
       <section className="card space-y-4">
@@ -89,18 +109,21 @@ export function ClientForm({ client }: { client?: SafeClient }) {
       </section>
 
       <section className="card space-y-4">
-        <h2 className="font-semibold">Home</h2>
+        <div>
+          <h2 className="font-semibold">{roofing ? "Roof size" : "Home"}</h2>
+          {roofing && <p className="hint">Total roof surface area in sq ft (all roof sections, measured along the slope).</p>}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="min">Minimum sq ft</label>
+            <label className="label" htmlFor="min">Minimum {roofing ? "roof" : "home"} sq ft</label>
             <input id="min" name="min_sqft" inputMode="numeric" className="input" defaultValue={client?.min_sqft ?? ""} placeholder="No minimum" />
           </div>
           <div>
-            <label className="label" htmlFor="max">Maximum sq ft</label>
+            <label className="label" htmlFor="max">Maximum {roofing ? "roof" : "home"} sq ft</label>
             <input id="max" name="max_sqft" inputMode="numeric" className="input" defaultValue={client?.max_sqft ?? ""} placeholder="No maximum" />
           </div>
         </div>
-        <fieldset>
+        <fieldset hidden={roofing}>
           <legend className="label">Accepted property types</legend>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {PROPERTY_TYPES.map((t) => (

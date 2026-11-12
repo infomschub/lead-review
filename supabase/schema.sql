@@ -3,6 +3,7 @@
 create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  company_type text not null default 'roofing' check (company_type in ('roofing','home_improvement')),
   active boolean not null default true,
   ghl_location_id text not null default '',
   ghl_token text,
@@ -34,6 +35,7 @@ create table if not exists leads (
   formatted_address text,
   lat double precision, lng double precision,
   sqft integer, property_type text, year_built integer,
+  roof_sqft integer, roof_pitch integer, size_source text,
   distance_miles double precision,
   in_area boolean,
 
@@ -55,13 +57,14 @@ create table if not exists leads (
 );
 create index if not exists leads_client_created on leads (client_id, lead_created_at desc);
 
--- Each address is looked up once, ever, to keep property-data costs down.
+-- Each address is looked up once per company type (key = '<type>:<address>'), to keep API costs down.
 create table if not exists property_cache (
   address_key text primary key,
   status text not null,
   formatted_address text,
   lat double precision, lng double precision, zip text,
   sqft integer, property_type text, year_built integer,
+  roof_sqft integer, roof_pitch integer, size_source text,
   looked_up_at timestamptz not null default now()
 );
 

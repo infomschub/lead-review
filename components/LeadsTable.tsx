@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { finalGrade, type Grade, type Lead } from "@/lib/types";
+import { finalGrade, sizeLabel, type CompanyType, type Grade, type Lead } from "@/lib/types";
 import { responseMinutes, fmtMinutes } from "@/lib/stats";
 import { GradePill, GRADE_LABEL } from "./ui";
 import { overrideLead } from "@/app/actions";
@@ -38,18 +38,21 @@ function Yes({ on, children }: { on: boolean; children?: React.ReactNode }) {
 }
 
 function csv(leads: Lead[]) {
-  const head = ["Created", "Name", "Phone", "Email", "Address", "Sq ft", "Property type", "Year built", "Distance (mi)", "In area", "Grade", "Reasons", "Team note", "Responsive", "Client replied", "Response time (min)", "Booked", "Appointment", "Source"];
+  const head = ["Created", "Name", "Phone", "Email", "Address", "Home sq ft", "Property type", "Year built", "Roof sq ft", "Roof pitch (deg)", "Size source", "Distance (mi)", "In area", "Grade", "Reasons", "Team note", "Responsive", "Client replied", "Response time (min)", "Booked", "Appointment", "Source"];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = leads.map((l) => [
     l.lead_created_at, l.name, l.phone, l.email, l.formatted_address ?? l.address, l.sqft, l.property_type, l.year_built,
-    l.distance_miles, l.in_area == null ? "" : l.in_area ? "Yes" : "No", GRADE_LABEL[finalGrade(l)], l.reasons.join("; "),
+    l.roof_sqft, l.roof_pitch, l.size_source, l.distance_miles, l.in_area == null ? "" : l.in_area ? "Yes" : "No", GRADE_LABEL[finalGrade(l)], l.reasons.join("; "),
     l.override_note, l.responsive ? "Yes" : "No", l.client_responded ? "Yes" : "No", responseMinutes(l), l.booked ? "Yes" : "No",
     l.appointment_at, l.source,
   ]);
   return [head, ...rows].map((r) => r.map(esc).join(",")).join("\n");
 }
 
-export function LeadsTable({ leads, clientId, clientName }: { leads: Lead[]; clientId: string; clientName: string }) {
+export function LeadsTable({
+  leads, clientId, clientName, companyType,
+}: { leads: Lead[]; clientId: string; clientName: string; companyType: CompanyType }) {
+  const roofing = companyType === "roofing";
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -100,7 +103,7 @@ export function LeadsTable({ leads, clientId, clientName }: { leads: Lead[]; cli
             <tr>
               <th className="px-4 py-2.5">Lead</th>
               <th className="px-3 py-2.5">Address</th>
-              <th className="px-3 py-2.5 text-right">Home size</th>
+              <th className="px-3 py-2.5 text-right">{sizeLabel(companyType)}</th>
               <th className="px-3 py-2.5">Targeting</th>
               <th className="px-3 py-2.5">Responsive</th>
               <th className="px-3 py-2.5">Client replied</th>
@@ -135,10 +138,19 @@ export function LeadsTable({ leads, clientId, clientName }: { leads: Lead[]; cli
                     {l.distance_miles != null && <p className="text-xs text-stone-500">{l.distance_miles} mi from center</p>}
                   </td>
                   <td className="px-3 py-3 text-right">
-                    {l.sqft != null ? <p className="font-medium tabular-nums">{l.sqft.toLocaleString()} sq ft</p> : <p className="text-stone-400">–</p>}
-                    <p className="text-xs text-stone-500">
-                      {[l.property_type, l.year_built && `built ${l.year_built}`].filter(Boolean).join(" · ")}
-                    </p>
+                    {(() => {
+                      const size = roofing ? l.roof_sqft : l.sqft;
+                      const details = roofing
+                        ? [l.roof_pitch != null && `${l.roof_pitch}° pitch`]
+                        : [l.property_type, l.year_built && `built ${l.year_built}`];
+                      return (
+                        <>
+                          {size != null ? <p className="font-medium tabular-nums">{size.toLocaleString()} sq ft</p> : <p className="text-stone-400">–</p>}
+                          <p className="text-xs text-stone-500">{details.filter(Boolean).join(" · ")}</p>
+                          {l.size_source && <p className="text-xs text-stone-400">via {l.size_source}</p>}
+                        </>
+                      );
+                    })()}
                   </td>
                   <td className="max-w-[260px] px-3 py-3">
                     <GradePill grade={g} overridden={!!l.override_grade} />

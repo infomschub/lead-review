@@ -22,22 +22,22 @@ export function demoData(): { clients: Client[]; leads: Lead[] } {
   const now = Date.now();
   const clients: Client[] = [
     {
-      ...base, id: "demo-summit", name: "Summit Roofing Co.", ghl_location_id: "demo-loc-1",
+      ...base, id: "demo-summit", name: "Summit Roofing Co.", company_type: "roofing", ghl_location_id: "demo-loc-1",
       center_address: "Denver, CO", center_lat: 39.7392, center_lng: -104.9903, radius_miles: 30,
-      target_zips: [], min_sqft: 1400, max_sqft: null,
+      target_zips: [], min_sqft: 1600, max_sqft: null, allowed_property_types: [],
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 90 * 864e5).toISOString(),
     },
     {
-      ...base, id: "demo-coastal", name: "Coastal Exteriors", ghl_location_id: "demo-loc-2",
+      ...base, id: "demo-coastal", name: "Coastal Home Remodeling", company_type: "home_improvement", ghl_location_id: "demo-loc-2",
       center_address: null, center_lat: null, center_lng: null, radius_miles: null,
       target_zips: ["33602", "33606", "33609", "33611", "33629", "33618", "33647", "33626"],
       min_sqft: 1800, max_sqft: 6000,
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 60 * 864e5).toISOString(),
     },
     {
-      ...base, id: "demo-prairie", name: "Prairie Home Solar", ghl_location_id: "demo-loc-3",
+      ...base, id: "demo-prairie", name: "Prairie Roofing & Gutters", company_type: "roofing", ghl_location_id: "demo-loc-3",
       center_address: "Omaha, NE", center_lat: 41.2565, center_lng: -95.9345, radius_miles: 40,
-      target_zips: [], min_sqft: 1200, max_sqft: null, allowed_property_types: ["Single Family"],
+      target_zips: [], min_sqft: 1400, max_sqft: null, allowed_property_types: [],
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 30 * 864e5).toISOString(),
     },
   ];
@@ -50,7 +50,7 @@ export function demoData(): { clients: Client[]; leads: Lead[] } {
 
   const leads: Lead[] = [];
   const counts: Record<string, number> = { "demo-summit": 34, "demo-coastal": 26, "demo-prairie": 19 };
-  const r = rng(42);
+  const r = rng(7);
   const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
 
   for (const c of clients) {
@@ -87,8 +87,19 @@ export function demoData(): { clients: Client[]; leads: Lead[] } {
         lead_created_at: new Date(created).toISOString(),
         property_status: status, formatted_address: null,
         lat: status === "no_address" ? null : lat, lng: status === "no_address" ? null : lng,
-        sqft: status === "found" ? sqft : null, property_type: status === "found" ? ptype : null,
-        year_built: status === "found" ? 1950 + Math.floor(r() * 72) : null,
+        ...(c.company_type === "roofing"
+          ? {
+              sqft: null, property_type: null, year_built: null,
+              roof_sqft: status === "found" && sqft ? Math.round((sqft * (0.85 + r() * 0.7)) / 10) * 10 : null,
+              roof_pitch: status === "found" ? 14 + Math.floor(r() * 26) : null,
+              size_source: status === "found" ? "Google Solar" : null,
+            }
+          : {
+              sqft: status === "found" ? sqft : null, property_type: status === "found" ? ptype : null,
+              year_built: status === "found" ? 1950 + Math.floor(r() * 72) : null,
+              roof_sqft: null, roof_pitch: null,
+              size_source: status === "found" ? (r() < 0.7 ? "Redfin" : "Zillow") : null,
+            }),
         distance_miles: null, in_area: null,
         responsive, first_inbound_at: firstIn ? new Date(firstIn).toISOString() : null,
         client_responded: clientResp, first_response_at: firstResp ? new Date(firstResp).toISOString() : null,

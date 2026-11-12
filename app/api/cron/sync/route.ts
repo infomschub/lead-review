@@ -4,7 +4,7 @@ import { syncAll } from "@/lib/sync";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-/** Vercel Cron hits this daily (see vercel.json). */
+/** Vercel Cron: Sundays 23:00 UTC = Mondays 7:00 AM Philippine time (see vercel.json). */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {

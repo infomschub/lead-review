@@ -5,19 +5,21 @@ import { tally } from "@/lib/stats";
 import { TallyTiles, RangeTabs, timeAgo } from "@/components/ui";
 import { SyncButton } from "@/components/SyncButton";
 import { LeadsTable } from "@/components/LeadsTable";
-import type { Client } from "@/lib/types";
+import { COMPANY_LABEL, type Client } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 function targetingSummary(c: Client) {
-  const parts: string[] = [];
+  const parts: string[] = [COMPANY_LABEL[c.company_type]];
+  const what = c.company_type === "roofing" ? "roof" : "home";
   if (c.center_address && c.radius_miles) parts.push(`Within ${c.radius_miles} mi of ${c.center_address}`);
   if (c.target_zips.length) parts.push(`${c.target_zips.length} ZIP code${c.target_zips.length === 1 ? "" : "s"}`);
-  if (!parts.length) parts.push("Any location");
-  if (c.min_sqft && c.max_sqft) parts.push(`${c.min_sqft.toLocaleString()}–${c.max_sqft.toLocaleString()} sq ft`);
-  else if (c.min_sqft) parts.push(`${c.min_sqft.toLocaleString()}+ sq ft`);
-  else if (c.max_sqft) parts.push(`Up to ${c.max_sqft.toLocaleString()} sq ft`);
-  parts.push(c.allowed_property_types.length ? c.allowed_property_types.join(" / ") : "Any property type");
+  if (parts.length === 1) parts.push("Any location");
+  if (c.min_sqft && c.max_sqft) parts.push(`${c.min_sqft.toLocaleString()}–${c.max_sqft.toLocaleString()} sq ft ${what}`);
+  else if (c.min_sqft) parts.push(`${c.min_sqft.toLocaleString()}+ sq ft ${what}`);
+  else if (c.max_sqft) parts.push(`Up to ${c.max_sqft.toLocaleString()} sq ft ${what}`);
+  if (c.company_type === "home_improvement")
+    parts.push(c.allowed_property_types.length ? c.allowed_property_types.join(" / ") : "Any property type");
   return parts;
 }
 
@@ -64,7 +66,7 @@ export default async function ClientPage({
       </div>
 
       <TallyTiles t={t} />
-      <LeadsTable leads={leads} clientId={id} clientName={client.name} />
+      <LeadsTable leads={leads} clientId={id} clientName={client.name} companyType={client.company_type} />
     </div>
   );
 }

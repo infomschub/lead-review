@@ -8,7 +8,7 @@ import { syncAll, syncClient } from "@/lib/sync";
 import { geocode } from "@/lib/property";
 import { testConnection } from "@/lib/ghl";
 import { gradeLead } from "@/lib/grade";
-import type { Client, Grade } from "@/lib/types";
+import type { Client, CompanyType, Grade } from "@/lib/types";
 
 export async function login(formData: FormData) {
   const pw = String(formData.get("password") ?? "");
@@ -44,10 +44,12 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
     else return { error: "Couldn't find that center address. Add a Google Maps key, or enter latitude/longitude." };
   }
 
+  const company_type: CompanyType = formData.get("company_type") === "home_improvement" ? "home_improvement" : "roofing";
   const tokenIn = String(formData.get("ghl_token") ?? "").trim();
   const client: Partial<Client> & { name: string } = {
     ...(id ? { id } : {}),
     name,
+    company_type,
     active: formData.get("active") === "on",
     ghl_location_id: String(formData.get("ghl_location_id") ?? "").trim(),
     // Blank token field on edit = keep the saved one.
@@ -62,7 +64,7 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
     radius_miles: centerAddress ? num(formData.get("radius_miles")) : null,
     min_sqft: num(formData.get("min_sqft")),
     max_sqft: num(formData.get("max_sqft")),
-    allowed_property_types: formData.getAll("allowed_property_types").map(String),
+    allowed_property_types: company_type === "roofing" ? [] : formData.getAll("allowed_property_types").map(String),
     notes: String(formData.get("notes") ?? "").trim() || null,
   };
   const saved = await s.saveClient(client);

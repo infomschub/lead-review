@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { store } from "@/lib/store";
+import { COMPANY_LABEL } from "@/lib/types";
 import { tally, pct, fmtMinutes } from "@/lib/stats";
 import { TallyTiles, QualityBar, RangeTabs, timeAgo } from "@/components/ui";
 import { SyncButton } from "@/components/SyncButton";
@@ -22,7 +23,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">All active clients</h1>
-          <p className="text-sm text-stone-500">Leads from the last {days} days, checked automatically every morning.</p>
+          <p className="text-sm text-stone-500">Leads from the last {days} days. Checked automatically every Monday at 7:00 AM (PHT).</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <RangeTabs days={days} base="/" />
@@ -61,6 +62,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
                 <tr key={c.id} className="hover:bg-stone-50">
                   <td className="px-4 py-3">
                     <Link href={`/clients/${c.id}?days=${days}`} className="font-medium text-brand hover:underline">{c.name}</Link>
+                    <p className="text-xs text-stone-500">{COMPANY_LABEL[c.company_type]}</p>
                     {c.last_sync_error && <p className="text-xs text-red-600" title={c.last_sync_error}>Sync problem</p>}
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{t.total}</td>

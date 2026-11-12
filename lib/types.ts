@@ -1,5 +1,10 @@
 export type Grade = "good" | "bad" | "review";
 
+/** Roofing clients are judged on roof size (Google Solar). Home improvement on home size (scraped from listing sites). */
+export type CompanyType = "roofing" | "home_improvement";
+export const COMPANY_LABEL: Record<CompanyType, string> = { roofing: "Roofing", home_improvement: "Home improvement" };
+export const sizeLabel = (t: CompanyType) => (t === "roofing" ? "Roof size" : "Home size");
+
 export const PROPERTY_TYPES = [
   "Single Family",
   "Townhouse",
@@ -14,6 +19,7 @@ export const PROPERTY_TYPES = [
 export interface Client {
   id: string;
   name: string;
+  company_type: CompanyType;
   active: boolean;
   /** GHL sub-account (location) ID. */
   ghl_location_id: string;
@@ -26,9 +32,10 @@ export interface Client {
   center_lat: number | null;
   center_lng: number | null;
   radius_miles: number | null;
+  /** Applies to roof sq ft for roofing clients, home sq ft for home improvement. */
   min_sqft: number | null;
   max_sqft: number | null;
-  /** Empty = any property type allowed. */
+  /** Home improvement only. Empty = any property type allowed. */
   allowed_property_types: string[];
   notes: string | null;
   last_synced_at: string | null;
@@ -60,6 +67,10 @@ export interface Lead {
   sqft: number | null;
   property_type: string | null;
   year_built: number | null;
+  roof_sqft: number | null;
+  roof_pitch: number | null;
+  /** Where the size came from: "Google Solar", "Redfin", "Zillow". */
+  size_source: string | null;
   distance_miles: number | null;
   in_area: boolean | null;
 
@@ -90,7 +101,13 @@ export interface PropertyResult {
   sqft: number | null;
   property_type: string | null;
   year_built: number | null;
+  roof_sqft: number | null;
+  roof_pitch: number | null;
+  size_source: string | null;
 }
 
 export const finalGrade = (l: Pick<Lead, "grade" | "override_grade">): Grade =>
   l.override_grade ?? l.grade;
+
+export const measuredSize = (c: Pick<Client, "company_type">, l: Pick<Lead, "sqft" | "roof_sqft">) =>
+  c.company_type === "roofing" ? l.roof_sqft : l.sqft;
