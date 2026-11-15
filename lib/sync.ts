@@ -55,10 +55,12 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
       };
 
       // Size lookup: once per address per company type (cached), retried if the last try errored.
-      if (!c.address) {
+      if (!c.address && !c.city && !c.zip) {
         Object.assign(row, { property_status: "no_address", sqft: null, roof_sqft: null, property_type: null, lat: null, lng: null });
       } else {
-        const key = `${client.company_type}:${addressKey(c)}`;
+        // v2: lookups now refuse to measure when only the street/city/ZIP was found.
+        // A lead with just a city or ZIP is still placed on the map for the area check.
+        const key = `v2:${client.company_type}:${addressKey(c)}`;
         let p = await s.getCachedProperty(key);
         if (!p || p.status === "error") {
           p = await lookupProperty(fullAddress(c), client.company_type);

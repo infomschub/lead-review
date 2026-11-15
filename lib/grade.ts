@@ -14,7 +14,7 @@ const zip5 = (z: string | null | undefined) => (z ?? "").trim().slice(0, 5);
 
 type GradeInput = Pick<
   Lead,
-  "property_status" | "lat" | "lng" | "zip" | "sqft" | "roof_sqft" | "property_type" | "address"
+  "property_status" | "lat" | "lng" | "zip" | "sqft" | "roof_sqft" | "property_type" | "address" | "city"
 >;
 
 export interface GradeResult {
@@ -22,40 +22,60 @@ export interface GradeResult {
   reasons: string[];
   in_area: boolean | null;
   distance_miles: number | null;
+  nearest_area: string | null;
 }
 
-/** Area check: in-area if the ZIP is listed OR the home is inside the radius. */
-export function checkArea(client: Client, lead: GradeInput) {
-  const hasZips = client.target_zips.length > 0;
-  const hasRadius =
-    client.center_lat != null && client.center_lng != null && (client.radius_miles ?? 0) > 0;
+/** In the area if the ZIP is listed OR the home is inside ANY pin's radius. Distance is to the closest pin. */
+export function checkArea(client: Client, lead: Pick<Lead, "lat" | "lng" | "zip">) {
+  const zips = client.target_zips.map(zip5);
+  const pins = (client.areas ?? []).filter((a) => a.radius_miles > 0);
 
   let distance: number | null = null;
-  if (hasRadius && lead.lat != null && lead.lng != null) {
-    distance = Math.round(haversineMiles(client.center_lat!, client.center_lng!, lead.lat, lead.lng) * 10) / 10;
+  let nearest: string | null = null;
+  let insidePin = false;
+  if (pins.length && lead.lat != null && lead.lng != null) {
+    for (const a of pins) {
+      const d = Math.round(haversineMiles(a.lat, a.lng, lead.lat, lead.lng) * 10) / 10;
+      if (d <= a.radius_miles) insidePin = true;
+      if (distance == null || d < distance) [distance, nearest] = [d, a.label];
+    }
   }
-  if (!hasZips && !hasRadius) return { in_area: true, distance, unknown: false };
+  if (!zips.length && !pins.length) return { in_area: true as boolean | null, distance, nearest };
 
-  const zipOk = hasZips && lead.zip ? client.target_zips.map(zip5).includes(zip5(lead.zip)) : false;
-  const radiusOk = distance != null ? distance <= client.radius_miles! : false;
+  const zipOk = zips.length > 0 && !!lead.zip && zips.includes(zip5(lead.zip));
   const unknown = !lead.zip && distance == null;
-  return { in_area: unknown ? null : zipOk || radiusOk, distance, unknown };
+  return { in_area: unknown ? null : zipOk || insidePin, distance, nearest };
 }
 
 export function gradeLead(client: Client, lead: GradeInput): GradeResult {
   const bad: string[] = [];
   const review: string[] = [];
-
-  if (lead.property_status === "no_address" || !lead.address) {
-    return { grade: "review", reasons: ["No address on the lead"], in_area: null, distance_miles: null };
-  }
+  const incompleteGrade: Grade = client.incomplete_as === "bad" ? "bad" : "review";
 
   const area = checkArea(client, lead);
+  const base = { in_area: area.in_area, distance_miles: area.distance, nearest_area: area.nearest };
+  const pinName = (n: string | null) => (n ? ` from ${n}` : "");
+
   if (area.in_area === false) {
-    bad.push(area.distance != null ? `Outside service area (${area.distance} mi away)` : `Outside service area (ZIP ${lead.zip})`);
-  } else if (area.in_area === null) {
-    review.push("Couldn't place the address on a map");
+    bad.push(
+      area.distance != null
+        ? `Outside service area (${area.distance} mi${pinName(area.nearest)})`
+        : `Outside service area (ZIP ${lead.zip})`,
+    );
   }
+
+  // Missing or partial address: judge the area if we can place it, otherwise apply the client's setting.
+  if (lead.property_status === "no_address" || lead.property_status === "incomplete" || !lead.address) {
+    const what = !lead.address
+      ? lead.city || lead.zip
+        ? "No street address (only city/ZIP)"
+        : "No address on the lead"
+      : "Incomplete address, can't find the exact house";
+    if (bad.length) return { grade: "bad", reasons: [...bad, what], ...base };
+    return { grade: incompleteGrade, reasons: [what], ...base };
+  }
+
+  if (area.in_area === null) review.push("Couldn't place the address on a map");
 
   const roof = checksRoof(client.company_type);
   const home = checksHome(client.company_type);
@@ -80,7 +100,7 @@ export function gradeLead(client: Client, lead: GradeInput): GradeResult {
     review.push("Property lookup pending");
   }
 
-  if (bad.length) return { grade: "bad", reasons: [...bad, ...review], in_area: area.in_area, distance_miles: area.distance };
-  if (review.length) return { grade: "review", reasons: review, in_area: area.in_area, distance_miles: area.distance };
-  return { grade: "good", reasons: ["Meets targeting"], in_area: area.in_area, distance_miles: area.distance };
+  if (bad.length) return { grade: "bad", reasons: [...bad, ...review], ...base };
+  if (review.length) return { grade: "review", reasons: review, ...base };
+  return { grade: "good", reasons: ["Meets targeting"], ...base };
 }

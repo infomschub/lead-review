@@ -19,7 +19,9 @@ Each address is looked up once per company type and cached.
 | **Waiting on client** | The lead replied but the client hasn't. This is the follow-up list. |
 | **Booked** | Any non-cancelled appointment for the contact on any of the sub-account's calendars (read in one sweep per sync). If GHL refuses the calendar read, the error shows on the client's page instead of the lead looking unbooked. |
 
-Service area = listed ZIP codes **or** within X miles of a center address (either one is enough).
+Service area = listed ZIP codes **or** inside any of the client's pins (each pin is a city, address or `lat, lng` with its own radius, like Facebook location targeting).
+
+Incomplete addresses: the roof/home is only measured when Google finds the exact house. A lead with only a street, city or ZIP is still checked against the service area (Bad if outside), and otherwise graded per the client's setting: Needs review (default) or Bad.
 
 ## Going live
 

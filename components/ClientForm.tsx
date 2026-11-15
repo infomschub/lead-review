@@ -4,6 +4,9 @@ import { useActionState, useState, useTransition } from "react";
 import { saveClient, testGhl } from "@/app/actions";
 import { PROPERTY_TYPES, type Client, type CompanyType } from "@/lib/types";
 
+let keySeq = 0;
+const nextKey = () => ++keySeq;
+
 export type SafeClient = Omit<Client, "ghl_token"> & { hasToken: boolean };
 
 export function ClientForm({ client }: { client?: SafeClient }) {
@@ -14,6 +17,10 @@ export function ClientForm({ client }: { client?: SafeClient }) {
   const [testing, startTest] = useTransition();
   const types = client?.allowed_property_types?.length ? client.allowed_property_types : ["Single Family", "Townhouse"];
   const [kind, setKind] = useState<CompanyType>(client?.company_type ?? "roofing");
+  const [pins, setPins] = useState(() => {
+    const saved = (client?.areas ?? []).map((a) => ({ key: nextKey(), label: a.label, radius: String(a.radius_miles) }));
+    return saved.length ? saved : [{ key: nextKey(), label: "", radius: "" }];
+  });
   const roof = kind !== "home_improvement";
   const home = kind !== "roofing";
 
@@ -84,25 +91,52 @@ export function ClientForm({ client }: { client?: SafeClient }) {
       <section className="card space-y-4">
         <div>
           <h2 className="font-semibold">Service area</h2>
-          <p className="hint">A lead is in the area if its ZIP is listed <strong>or</strong> the home is inside the radius. Leave both empty to accept any location.</p>
+          <p className="hint">
+            A lead is in the area if it&apos;s inside <strong>any</strong> pin&apos;s radius <strong>or</strong> its ZIP is listed.
+            Add one pin per Facebook location. Leave pins and ZIPs empty to accept any location.
+          </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="sm:col-span-2">
-            <label className="label" htmlFor="center">Center address or city</label>
-            <input id="center" name="center_address" className="input" defaultValue={client?.center_address ?? ""} placeholder="e.g. 123 Main St, Denver, CO" />
+        <div className="space-y-2">
+          <div className="hidden grid-cols-[1fr_8rem_2rem] gap-2 text-sm font-medium text-stone-700 sm:grid">
+            <span>Pin: city, address, or coordinates</span>
+            <span>Radius (miles)</span>
+            <span />
           </div>
-          <div>
-            <label className="label" htmlFor="radius">Radius (miles)</label>
-            <input id="radius" name="radius_miles" inputMode="decimal" className="input" defaultValue={client?.radius_miles ?? ""} placeholder="30" />
-          </div>
+          {pins.map((p, k) => (
+            <div key={p.key} className="grid grid-cols-[1fr_6rem_2rem] gap-2 sm:grid-cols-[1fr_8rem_2rem]">
+              <input
+                name="pin_label"
+                aria-label={`Pin ${k + 1} location`}
+                className="input"
+                defaultValue={p.label}
+                placeholder="Denver, CO  or  39.7392, -104.9903"
+              />
+              <input
+                name="pin_radius"
+                aria-label={`Pin ${k + 1} radius in miles`}
+                inputMode="decimal"
+                className="input"
+                defaultValue={p.radius}
+                placeholder="25"
+              />
+              <button
+                type="button"
+                className="rounded-lg text-stone-400 hover:bg-stone-100 hover:text-red-600"
+                aria-label={`Remove pin ${k + 1}`}
+                onClick={() => setPins((all) => all.filter((x) => x.key !== p.key))}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button type="button" className="btn-ghost" onClick={() => setPins((all) => [...all, { key: nextKey(), label: "", radius: "" }])}>
+            + Add pin
+          </button>
+          <p className="hint">
+            For a dropped pin in Facebook, copy its coordinates (from Google Maps: right-click the spot → click the numbers) and paste them as{" "}
+            <span className="font-mono">lat, lng</span>.
+          </p>
         </div>
-        <details className="text-sm">
-          <summary className="cursor-pointer text-stone-600">No Google Maps key? Enter the center&apos;s coordinates instead</summary>
-          <div className="mt-2 grid gap-4 sm:grid-cols-2">
-            <input name="center_lat" className="input" placeholder="Latitude, e.g. 39.7392" defaultValue={client?.center_lat ?? ""} />
-            <input name="center_lng" className="input" placeholder="Longitude, e.g. -104.9903" defaultValue={client?.center_lng ?? ""} />
-          </div>
-        </details>
         <div>
           <label className="label" htmlFor="zips">ZIP codes</label>
           <textarea id="zips" name="target_zips" rows={3} className="input font-mono" defaultValue={client?.target_zips.join(", ")} placeholder="33602, 33606, 33609" />
@@ -157,6 +191,17 @@ export function ClientForm({ client }: { client?: SafeClient }) {
       </section>
 
       <section className="card space-y-4">
+        <div>
+          <label className="label" htmlFor="incomplete">Leads with a missing or incomplete address</label>
+          <select id="incomplete" name="incomplete_as" className="input sm:w-80" defaultValue={client?.incomplete_as ?? "review"}>
+            <option value="review">Needs review</option>
+            <option value="bad">Bad</option>
+          </select>
+          <p className="hint">
+            No street address, or Google can&apos;t find the exact house, so the roof/home can&apos;t be measured.
+            They&apos;re still marked Bad if the city or ZIP is outside the service area.
+          </p>
+        </div>
         <div>
           <label className="label" htmlFor="notes">Notes for the team</label>
           <textarea id="notes" name="notes" rows={2} className="input" defaultValue={client?.notes ?? ""} />

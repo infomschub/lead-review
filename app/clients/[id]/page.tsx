@@ -12,7 +12,7 @@ export const maxDuration = 300;
 
 function targetingSummary(c: Client) {
   const parts: string[] = [COMPANY_LABEL[c.company_type]];
-  if (c.center_address && c.radius_miles) parts.push(`Within ${c.radius_miles} mi of ${c.center_address}`);
+  for (const a of c.areas ?? []) parts.push(`${a.radius_miles} mi of ${a.label}`);
   if (c.target_zips.length) parts.push(`${c.target_zips.length} ZIP code${c.target_zips.length === 1 ? "" : "s"}`);
   if (parts.length === 1) parts.push("Any location");
   const range = (what: string, min: number | null, max: number | null) => {
@@ -22,6 +22,7 @@ function targetingSummary(c: Client) {
   };
   if (checksRoof(c.company_type)) range("roof", c.min_roof_sqft, c.max_roof_sqft);
   if (checksHome(c.company_type)) range("home", c.min_sqft, c.max_sqft);
+  if (c.incomplete_as === "bad") parts.push("Incomplete address = Bad");
   if (checksHome(c.company_type))
     parts.push(c.allowed_property_types.length ? c.allowed_property_types.join(" / ") : "Any property type");
   return parts;

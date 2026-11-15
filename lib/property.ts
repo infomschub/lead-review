@@ -42,7 +42,12 @@ export async function geocode(address: string) {
   const data = (await res.json()) as {
     status: string;
     error_message?: string;
-    results: { formatted_address: string; geometry: { location: { lat: number; lng: number } }; address_components: { types: string[]; short_name: string }[] }[];
+    results: {
+      formatted_address: string;
+      types: string[];
+      geometry: { location: { lat: number; lng: number } };
+      address_components: { types: string[]; short_name: string }[];
+    }[];
   };
   const r = data.results?.[0];
   if (data.status !== "OK" || !r) {
@@ -56,7 +61,19 @@ export async function geocode(address: string) {
     lat: r.geometry.location.lat,
     lng: r.geometry.location.lng,
     zip: r.address_components.find((c) => c.types.includes("postal_code"))?.short_name ?? null,
+    /** Google matched an actual house, not just a street, city or ZIP. */
+    precise: r.types.some((t) => PRECISE_TYPES.has(t)),
   };
+}
+
+const PRECISE_TYPES = new Set(["street_address", "premise", "subpremise"]);
+
+/** "39.7392, -104.9903" (e.g. copied from a Facebook or Google Maps pin) -> coordinates. */
+export function parseLatLng(text: string): { lat: number; lng: number } | null {
+  const m = text.trim().match(/^\(?\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*\)?$/);
+  if (!m) return null;
+  const lat = Number(m[1]), lng = Number(m[2]);
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
 }
 
 const M2_TO_SQFT = 10.7639;
@@ -180,7 +197,10 @@ async function lookupHome(address: string) {
 export async function lookupProperty(address: string, type: CompanyType): Promise<PropertyResult> {
   try {
     const g = await geocode(address);
-    const placed: PropertyResult = { ...EMPTY, ...(g ?? {}) };
+    const { precise, ...where } = g ?? { precise: false };
+    const placed: PropertyResult = { ...EMPTY, ...where };
+    // Only measure when Google found the house itself. A street/city/ZIP match would measure the wrong roof.
+    if (g && !precise) return { ...placed, status: "incomplete" };
     const sources: string[] = [];
     let out: PropertyResult = placed;
     let failed = false;

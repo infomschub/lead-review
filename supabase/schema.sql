@@ -12,6 +12,8 @@ create table if not exists clients (
   center_lat double precision,
   center_lng double precision,
   radius_miles double precision,
+  areas jsonb not null default '[]'::jsonb,   -- pins: [{label, lat, lng, radius_miles}]
+  incomplete_as text not null default 'review' check (incomplete_as in ('review','bad')),
   min_sqft integer,        -- home sq ft
   max_sqft integer,
   min_roof_sqft integer,   -- roof sq ft
@@ -39,6 +41,7 @@ create table if not exists leads (
   sqft integer, property_type text, year_built integer,
   roof_sqft integer, roof_pitch integer, size_source text,
   distance_miles double precision,
+  nearest_area text,
   in_area boolean,
 
   responsive boolean not null default false,

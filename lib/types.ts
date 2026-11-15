@@ -33,11 +33,10 @@ export interface Client {
   ghl_token: string | null;
   /** Service area: any of these ZIPs counts as in-area. */
   target_zips: string[];
-  /** Service area: or within radius_miles of this point. */
-  center_address: string | null;
-  center_lat: number | null;
-  center_lng: number | null;
-  radius_miles: number | null;
+  /** Service area: or inside any of these pins (like Facebook location targeting). */
+  areas: Area[];
+  /** How leads with a missing or incomplete address are graded. */
+  incomplete_as: "review" | "bad";
   /** Home (living area) sq ft limits: home improvement and both. */
   min_sqft: number | null;
   max_sqft: number | null;
@@ -52,7 +51,19 @@ export interface Client {
   created_at: string;
 }
 
-export type PropertyStatus = "pending" | "found" | "not_found" | "no_address" | "error";
+export interface Area {
+  /** What the team typed: a city, an address, or "lat, lng" from a Facebook pin. */
+  label: string;
+  lat: number;
+  lng: number;
+  radius_miles: number;
+}
+
+/**
+ * incomplete: the address only resolves to a street, city or ZIP (no house number),
+ * so the location is approximate and the roof/home can't be measured.
+ */
+export type PropertyStatus = "pending" | "found" | "not_found" | "no_address" | "incomplete" | "error";
 
 export interface Lead {
   id: string;
@@ -81,6 +92,8 @@ export interface Lead {
   /** Where the size came from: "Google Solar", "Redfin", "Zillow". */
   size_source: string | null;
   distance_miles: number | null;
+  /** Label of the closest pin. */
+  nearest_area: string | null;
   in_area: boolean | null;
 
   // Engagement (from GHL conversations + appointments)

@@ -136,7 +136,12 @@ export function LeadsTable({
                     ) : (
                       <span className="text-stone-400">No address</span>
                     )}
-                    {l.distance_miles != null && <p className="text-xs text-stone-500">{l.distance_miles} mi from center</p>}
+                    {l.distance_miles != null && (
+                      <p className="text-xs text-stone-500">
+                        {l.distance_miles} mi from {l.nearest_area ?? "nearest pin"}
+                        {l.property_status === "incomplete" && " (approx.)"}
+                      </p>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right">
                     {showRoof && (

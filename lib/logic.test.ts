@@ -7,11 +7,11 @@ import type { Client } from "./types.ts";
 
 const client: Client = {
   id: "c", name: "T", company_type: "home_improvement", active: true, ghl_location_id: "", ghl_token: null, target_zips: ["80202"],
-  center_address: "Denver", center_lat: 39.7392, center_lng: -104.9903, radius_miles: 20,
+  areas: [{ label: "Denver", lat: 39.7392, lng: -104.9903, radius_miles: 20 }], incomplete_as: "review",
   min_sqft: 1400, max_sqft: 5000, min_roof_sqft: null, max_roof_sqft: null, allowed_property_types: ["Single Family"], notes: null,
   last_synced_at: null, last_sync_error: null, created_at: "",
 };
-const home = { property_status: "found" as const, address: "1 Main", lat: 39.75, lng: -104.98, zip: "80203", sqft: 2200, roof_sqft: null, property_type: "Single Family" };
+const home = { property_status: "found" as const, address: "1 Main", city: "Denver", lat: 39.75, lng: -104.98, zip: "80203", sqft: 2200, roof_sqft: null, property_type: "Single Family" };
 
 test("good home in radius", () => assert.equal(gradeLead(client, home).grade, "good"));
 test("too small", () => assert.match(gradeLead(client, { ...home, sqft: 900 }).reasons[0], /too small/));
@@ -82,4 +82,39 @@ test("both: missing roof with a roof limit -> review", () =>
 test("appointments from location sweep count as booked", () => {
   const e = deriveEngagement([], [{ startTime: t(500), appointmentStatus: "confirmed" }, { startTime: t(100), appointmentStatus: "cancelled" }]);
   assert.deepEqual([e.booked, e.appointment_at], [true, t(500)]);
+});
+
+const multi: Client = {
+  ...client, target_zips: [],
+  areas: [
+    { label: "Denver", lat: 39.7392, lng: -104.9903, radius_miles: 10 },
+    { label: "Boulder", lat: 40.015, lng: -105.2705, radius_miles: 10 },
+  ],
+};
+test("multiple pins: inside the second pin is in area, distance names nearest pin", () => {
+  const r = gradeLead(multi, { ...home, lat: 40.02, lng: -105.25, zip: "80302" });
+  assert.equal(r.grade, "good");
+  assert.equal(r.nearest_area, "Boulder");
+});
+test("multiple pins: outside every pin is bad", () => {
+  const r = gradeLead(multi, { ...home, lat: 40.6, lng: -105.1, zip: "80517" });
+  assert.equal(r.grade, "bad");
+  assert.match(r.reasons[0], /Outside service area .* from Boulder/);
+});
+test("incomplete address in area -> client setting", () => {
+  const lead = { ...home, property_status: "incomplete" as const, sqft: null, roof_sqft: null };
+  assert.equal(gradeLead(client, lead).grade, "review");
+  assert.equal(gradeLead({ ...client, incomplete_as: "bad" }, lead).grade, "bad");
+  assert.match(gradeLead(client, lead).reasons[0], /Incomplete address/);
+});
+test("city/ZIP only, outside area -> bad regardless of setting", () => {
+  const lead = { ...home, address: null, property_status: "incomplete" as const, lat: 41, lng: -106, zip: "80517" };
+  const r = gradeLead(client, lead);
+  assert.equal(r.grade, "bad");
+  assert.match(r.reasons.join(), /No street address/);
+});
+test("no address at all -> client setting", () => {
+  const lead = { ...home, address: null, city: null, zip: null, lat: null, lng: null, property_status: "no_address" as const };
+  assert.deepEqual(gradeLead(client, lead).reasons, ["No address on the lead"]);
+  assert.equal(gradeLead({ ...client, incomplete_as: "bad" }, lead).grade, "bad");
 });

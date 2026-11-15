@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { store, isDemo } from "@/lib/store";
 import { syncAll, syncClient } from "@/lib/sync";
-import { geocode, lastGeocodeError } from "@/lib/property";
+import { geocode, lastGeocodeError, parseLatLng } from "@/lib/property";
 import { testConnection } from "@/lib/ghl";
 import { gradeLead } from "@/lib/grade";
-import type { Client, CompanyType, Grade } from "@/lib/types";
+import type { Area, Client, CompanyType, Grade } from "@/lib/types";
 
 export async function login(formData: FormData) {
   const pw = String(formData.get("password") ?? "");
@@ -30,20 +30,26 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Client name is required." };
 
-  const centerAddress = String(formData.get("center_address") ?? "").trim() || null;
-  let center_lat = prev?.center_lat ?? null;
-  let center_lng = prev?.center_lng ?? null;
-  if (!centerAddress) {
-    center_lat = center_lng = null;
-  } else if (centerAddress !== prev?.center_address || center_lat == null) {
-    const latIn = num(formData.get("center_lat"));
-    const lngIn = num(formData.get("center_lng"));
-    const g = await geocode(centerAddress);
-    if (g) [center_lat, center_lng] = [g.lat, g.lng];
-    else if (latIn != null && lngIn != null) [center_lat, center_lng] = [latIn, lngIn];
-    else if (!process.env.GOOGLE_MAPS_API_KEY)
-      return { error: "Couldn't find that center address: GOOGLE_MAPS_API_KEY isn't set. Add it, or enter latitude/longitude." };
-    else return { error: `Couldn't find that center address. Google said: ${lastGeocodeError ?? "no result"}` };
+  // Pins: each row is a city/address or "lat, lng" from a Facebook pin, plus a radius in miles.
+  const labels = formData.getAll("pin_label").map((v) => String(v).trim());
+  const radii = formData.getAll("pin_radius").map((v) => num(v));
+  const areas: Area[] = [];
+  for (let k = 0; k < labels.length; k++) {
+    const label = labels[k];
+    if (!label) continue;
+    const radius = radii[k];
+    if (radius == null || radius <= 0) return { error: `Add a radius (miles) for the pin "${label}".` };
+    const same = prev?.areas?.find((a) => a.label === label);
+    const coords = parseLatLng(label) ?? (same ? { lat: same.lat, lng: same.lng } : null);
+    if (coords) {
+      areas.push({ label, ...coords, radius_miles: radius });
+      continue;
+    }
+    if (!process.env.GOOGLE_MAPS_API_KEY)
+      return { error: `Couldn't place "${label}": GOOGLE_MAPS_API_KEY isn't set. Paste the pin's coordinates instead (e.g. 39.7392, -104.9903).` };
+    const g = await geocode(label);
+    if (!g) return { error: `Couldn't place "${label}". Google said: ${lastGeocodeError ?? "no result"}. You can paste the pin's coordinates instead.` };
+    areas.push({ label, lat: g.lat, lng: g.lng, radius_miles: radius });
   }
 
   const ct = String(formData.get("company_type") ?? "");
@@ -63,10 +69,8 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
       .split(/[\s,;]+/)
       .map((z) => z.trim().slice(0, 5))
       .filter((z) => /^\d{5}$/.test(z)),
-    center_address: centerAddress,
-    center_lat,
-    center_lng,
-    radius_miles: centerAddress ? num(formData.get("radius_miles")) : null,
+    areas,
+    incomplete_as: formData.get("incomplete_as") === "bad" ? "bad" : "review",
     min_sqft: home ? num(formData.get("min_sqft")) : null,
     max_sqft: home ? num(formData.get("max_sqft")) : null,
     min_roof_sqft: roof ? num(formData.get("min_roof_sqft")) : null,
