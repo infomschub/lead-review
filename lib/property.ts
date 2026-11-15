@@ -29,6 +29,9 @@ const EMPTY: PropertyResult = {
 };
 
 // ---------- Google ----------
+/** Why the last geocode failed (Google's status + message), for showing in the setup form. */
+export let lastGeocodeError: string | null = null;
+
 export async function geocode(address: string) {
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) return null;
@@ -38,10 +41,16 @@ export async function geocode(address: string) {
   );
   const data = (await res.json()) as {
     status: string;
+    error_message?: string;
     results: { formatted_address: string; geometry: { location: { lat: number; lng: number } }; address_components: { types: string[]; short_name: string }[] }[];
   };
   const r = data.results?.[0];
-  if (data.status !== "OK" || !r) return null;
+  if (data.status !== "OK" || !r) {
+    lastGeocodeError = data.status === "ZERO_RESULTS" ? "Google found no match for that address." : `${data.status}${data.error_message ? `: ${data.error_message}` : ""}`;
+    if (data.status !== "ZERO_RESULTS") console.error("geocode", lastGeocodeError);
+    return null;
+  }
+  lastGeocodeError = null;
   return {
     formatted_address: r.formatted_address,
     lat: r.geometry.location.lat,

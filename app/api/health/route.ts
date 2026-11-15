@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { store, isDemo } from "@/lib/store";
-import { lookupConfigured } from "@/lib/property";
+import { lookupConfigured, geocode, lastGeocodeError } from "@/lib/property";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,13 @@ export async function GET() {
       database = `error: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
+  let google_geocoding = "not checked (no key)";
+  if (lookupConfigured()) {
+    const g = await geocode("Denver, CO");
+    google_geocoding = g ? "working" : `error: ${lastGeocodeError}`;
+  }
   return NextResponse.json({
+    google_geocoding,
     database,
     google_key: lookupConfigured() ? "set" : "missing",
     scraper_key: process.env.SCRAPER_API_KEY ? "set" : "missing",

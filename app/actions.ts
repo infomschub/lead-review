@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { store, isDemo } from "@/lib/store";
 import { syncAll, syncClient } from "@/lib/sync";
-import { geocode } from "@/lib/property";
+import { geocode, lastGeocodeError } from "@/lib/property";
 import { testConnection } from "@/lib/ghl";
 import { gradeLead } from "@/lib/grade";
 import type { Client, CompanyType, Grade } from "@/lib/types";
@@ -41,7 +41,9 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
     const g = await geocode(centerAddress);
     if (g) [center_lat, center_lng] = [g.lat, g.lng];
     else if (latIn != null && lngIn != null) [center_lat, center_lng] = [latIn, lngIn];
-    else return { error: "Couldn't find that center address. Add a Google Maps key, or enter latitude/longitude." };
+    else if (!process.env.GOOGLE_MAPS_API_KEY)
+      return { error: "Couldn't find that center address: GOOGLE_MAPS_API_KEY isn't set. Add it, or enter latitude/longitude." };
+    else return { error: `Couldn't find that center address. Google said: ${lastGeocodeError ?? "no result"}` };
   }
 
   const company_type: CompanyType = formData.get("company_type") === "home_improvement" ? "home_improvement" : "roofing";
