@@ -25,7 +25,9 @@ export const isDemo = () => !(process.env.SUPABASE_URL && process.env.SUPABASE_S
 class SupabaseStore implements Store {
   db: SupabaseClient;
   constructor() {
-    this.db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    // Accept the URL with or without a trailing slash or /rest/v1 on the end.
+    const url = process.env.SUPABASE_URL!.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "").replace(/\/+$/, "");
+    this.db = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!.trim(), {
       auth: { persistSession: false },
     });
   }
