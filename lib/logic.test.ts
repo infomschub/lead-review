@@ -11,7 +11,7 @@ const client: Client = {
   min_sqft: 1400, max_sqft: 5000, min_roof_sqft: null, max_roof_sqft: null, allowed_property_types: ["Single Family"], notes: null,
   last_synced_at: null, last_sync_error: null, created_at: "",
 };
-const home = { property_status: "found" as const, address: "1 Main", city: "Denver", lat: 39.75, lng: -104.98, zip: "80203", sqft: 2200, roof_sqft: null, property_type: "Single Family" };
+const home = { property_status: "found" as const, address: "1 Main", city: "Denver", lat: 39.75, lng: -104.98, zip: "80203", sqft: 2200, roof_sqft: null, footprint_sqft: null, property_type: "Single Family" };
 
 test("good home in radius", () => assert.equal(gradeLead(client, home).grade, "good"));
 test("too small", () => assert.match(gradeLead(client, { ...home, sqft: 900 }).reasons[0], /too small/));
@@ -133,3 +133,11 @@ test("opportunity in or past booked stage = booked; before = not", () => {
   assert.equal(bookedFromOpportunities([{ pipelineId: "p1", pipelineStageId: "s2" }], pipes), null);
   assert.equal(bookedFromOpportunities([{ pipelineId: "other", pipelineStageId: "s3" }], pipes), null);
 });
+
+test("home size falls back to footprint when living area is unknown", () => {
+  const lead = { ...home, sqft: null, footprint_sqft: 1300, property_type: null };
+  assert.match(gradeLead(client, lead).reasons[0], /Home footprint too small \(1,300/);
+  assert.equal(gradeLead({ ...client, min_sqft: 1200 }, lead).grade, "good");
+});
+test("living area wins over footprint when both exist", () =>
+  assert.equal(gradeLead(client, { ...home, sqft: 2200, footprint_sqft: 900 }).grade, "good"));

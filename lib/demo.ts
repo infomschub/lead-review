@@ -89,7 +89,7 @@ export function demoData(): { clients: Client[]; leads: Lead[] } {
         lat: status === "no_address" ? null : lat, lng: status === "no_address" ? null : lng,
         ...(c.company_type === "roofing"
           ? {
-              sqft: null, property_type: null, year_built: null,
+              sqft: null, property_type: null, year_built: null, footprint_sqft: null,
               roof_sqft: status === "found" && sqft ? Math.round((sqft * (0.85 + r() * 0.7)) / 10) * 10 : null,
               roof_pitch: status === "found" ? 14 + Math.floor(r() * 26) : null,
               size_source: status === "found" ? "Google Solar" : null,
@@ -97,7 +97,7 @@ export function demoData(): { clients: Client[]; leads: Lead[] } {
           : {
               sqft: status === "found" ? sqft : null, property_type: status === "found" ? ptype : null,
               year_built: status === "found" ? 1950 + Math.floor(r() * 72) : null,
-              roof_sqft: null, roof_pitch: null,
+              roof_sqft: null, roof_pitch: null, footprint_sqft: null,
               size_source: status === "found" ? (r() < 0.7 ? "Redfin" : "Zillow") : null,
             }),
         distance_miles: null, nearest_area: null, in_area: null,

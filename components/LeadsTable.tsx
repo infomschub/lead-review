@@ -38,11 +38,11 @@ function Yes({ on, children }: { on: boolean; children?: React.ReactNode }) {
 }
 
 function csv(leads: Lead[]) {
-  const head = ["Created", "Name", "Phone", "Email", "Address", "Home sq ft", "Property type", "Year built", "Roof sq ft", "Roof pitch (deg)", "Size source", "Distance (mi)", "In area", "Grade", "Reasons", "Team note", "Responsive", "Client replied", "Response time (min)", "Booked", "Appointment", "Source"];
+  const head = ["Created", "Name", "Phone", "Email", "Address", "Home sq ft", "Property type", "Year built", "Roof sq ft", "Roof pitch (deg)", "Footprint sq ft (approx.)", "Size source", "Distance (mi)", "In area", "Grade", "Reasons", "Team note", "Responsive", "Client replied", "Response time (min)", "Booked", "Appointment", "Source"];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = leads.map((l) => [
     l.lead_created_at, l.name, l.phone, l.email, l.formatted_address ?? l.address, l.sqft, l.property_type, l.year_built,
-    l.roof_sqft, l.roof_pitch, l.size_source, l.distance_miles, l.in_area == null ? "" : l.in_area ? "Yes" : "No", GRADE_LABEL[finalGrade(l)], l.reasons.join("; "),
+    l.roof_sqft, l.roof_pitch, l.footprint_sqft, l.size_source, l.distance_miles, l.in_area == null ? "" : l.in_area ? "Yes" : "No", GRADE_LABEL[finalGrade(l)], l.reasons.join("; "),
     l.override_note, l.responsive ? "Yes" : "No", l.client_responded ? "Yes" : "No", responseMinutes(l), l.booked ? "Yes" : "No",
     l.appointment_at, l.source,
   ]);
@@ -158,6 +158,10 @@ export function LeadsTable({
                       <div className={showRoof ? "mt-1" : ""}>
                         {l.sqft != null ? (
                           <p className="font-medium tabular-nums">{l.sqft.toLocaleString()} sq ft{showRoof && <span className="font-normal text-stone-500"> home</span>}</p>
+                        ) : l.footprint_sqft != null ? (
+                          <p className="font-medium tabular-nums" title="Ground area from satellite: one floor, includes an attached garage">
+                            {l.footprint_sqft.toLocaleString()} sq ft<span className="font-normal text-stone-500"> footprint (approx.)</span>
+                          </p>
                         ) : (
                           <p className="text-stone-400">–{showRoof && " home"}</p>
                         )}

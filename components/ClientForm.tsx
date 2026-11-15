@@ -164,7 +164,12 @@ export function ClientForm({ client }: { client?: SafeClient }) {
       <section className="card space-y-4" hidden={!home}>
         <div>
           <h2 className="font-semibold">Home</h2>
-          <p className="hint">Living area in sq ft. Leave blank for no limit.</p>
+          <p className="hint">
+            Home size is the building <strong>footprint</strong> from Google satellite data: the ground area of one floor,
+            including an attached garage. A 2-story home shows about half its living area, so set these limits as footprint
+            (e.g. a 2,500 sq ft 2-story home ≈ 1,300–1,600 sq ft footprint). Once ScraperAPI is added, exact living area from
+            Redfin/Zillow is used instead. Leave blank for no limit.
+          </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

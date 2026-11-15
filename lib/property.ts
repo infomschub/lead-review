@@ -25,7 +25,7 @@ export function fullAddress(parts: { address: string | null; city?: string | nul
 
 const EMPTY: PropertyResult = {
   status: "not_found", formatted_address: null, lat: null, lng: null, zip: null, sqft: null,
-  property_type: null, year_built: null, roof_sqft: null, roof_pitch: null, size_source: null,
+  property_type: null, year_built: null, roof_sqft: null, roof_pitch: null, footprint_sqft: null, size_source: null,
 };
 
 // ---------- Google ----------
@@ -90,7 +90,8 @@ export async function solarRoof(lat: number, lng: number) {
     if (!res.ok) throw new Error(`Google Solar ${res.status}: ${(await res.text()).slice(0, 160)}`);
     const d = (await res.json()) as {
       solarPotential?: {
-        wholeRoofStats?: { areaMeters2?: number };
+        wholeRoofStats?: { areaMeters2?: number; groundAreaMeters2?: number };
+        buildingStats?: { areaMeters2?: number; groundAreaMeters2?: number };
         roofSegmentStats?: { pitchDegrees?: number; stats?: { areaMeters2?: number } }[];
       };
     };
@@ -101,7 +102,13 @@ export async function solarRoof(lat: number, lng: number) {
     const pitch = segArea
       ? segs.reduce((a, s) => a + (s.pitchDegrees ?? 0) * (s.stats?.areaMeters2 ?? 0), 0) / segArea
       : null;
-    return { roof_sqft: Math.round(area * M2_TO_SQFT), roof_pitch: pitch == null ? null : Math.round(pitch) };
+    // Footprint = ground area under the whole building (includes attached garage; one floor only).
+    const ground = d.solarPotential?.buildingStats?.groundAreaMeters2 ?? d.solarPotential?.wholeRoofStats?.groundAreaMeters2;
+    return {
+      roof_sqft: Math.round(area * M2_TO_SQFT),
+      roof_pitch: pitch == null ? null : Math.round(pitch),
+      footprint_sqft: ground ? Math.round(ground * M2_TO_SQFT) : null,
+    };
   }
   return null;
 }
@@ -205,14 +212,17 @@ export async function lookupProperty(address: string, type: CompanyType): Promis
     let out: PropertyResult = placed;
     let failed = false;
 
-    if (type !== "home_improvement" && g) {
-      const roof = await solarRoof(g.lat, g.lng);
-      if (roof) {
-        out = { ...out, ...roof };
+    // Google Solar gives the roof (roofing) and the building footprint (home size estimate) in one call.
+    if (g) {
+      const solar = await solarRoof(g.lat, g.lng);
+      if (solar) {
+        out = { ...out, ...solar };
         sources.push("Google Solar");
       }
     }
-    if (type !== "roofing") {
+    // Exact living area + property type from Redfin/Zillow, only when ScraperAPI is set up
+    // (both sites block requests from cloud servers otherwise).
+    if (type !== "roofing" && process.env.SCRAPER_API_KEY) {
       const { home, error } = await lookupHome(address);
       if (home) {
         const { size_source, ...facts } = home;

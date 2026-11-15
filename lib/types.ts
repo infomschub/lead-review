@@ -89,6 +89,8 @@ export interface Lead {
   year_built: number | null;
   roof_sqft: number | null;
   roof_pitch: number | null;
+  /** Building footprint from Google Solar: ground area, one floor, includes attached garage. */
+  footprint_sqft: number | null;
   /** Where the size came from: "Google Solar", "Redfin", "Zillow". */
   size_source: string | null;
   distance_miles: number | null;
@@ -125,6 +127,7 @@ export interface PropertyResult {
   year_built: number | null;
   roof_sqft: number | null;
   roof_pitch: number | null;
+  footprint_sqft: number | null;
   size_source: string | null;
 }
 

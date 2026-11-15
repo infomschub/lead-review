@@ -10,7 +10,7 @@ Internal dashboard. Every Monday at 7:00 AM (Philippine time) it pulls the last 
 | Column | Where it comes from |
 |---|---|
 | **Roof size** (roofing and "both" clients) | Google Solar API: total roof area across all roof sections, plus average pitch |
-| **Home size, property type, year built** (home improvement and "both" clients) | Scraped from the Redfin listing page, with Zillow as a fallback. Both block cloud servers, so this goes through ScraperAPI. |
+| **Home size** (home improvement and "both" clients) | Building footprint from the same Google Solar call (ground area of one floor, includes an attached garage), labelled "footprint (approx.)". If `SCRAPER_API_KEY` is set, exact living area, property type and year built are scraped from Redfin (Zillow fallback) and used instead. |
 
 Each address is looked up once per company type and cached.
 | **Targeting: Good / Bad / Needs review** | **Bad**: outside the service area, roof/home too small or too large, or (home improvement) a property type the client doesn't accept. **Needs review**: no address, or no roof/home data found. **Good**: everything checks out. The team can override any grade and leave a note. |
@@ -34,7 +34,7 @@ Incomplete addresses: the roof/home is only measured when Google finds the exact
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 GOOGLE_MAPS_API_KEY=        # Geocoding + Solar
-SCRAPER_API_KEY=            # home improvement clients
+SCRAPER_API_KEY=            # optional: exact living area for home improvement clients
 DASHBOARD_PASSWORD=         # team login
 CRON_SECRET=                # any long random string; Vercel Cron sends it automatically
 ```

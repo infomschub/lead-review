@@ -39,7 +39,7 @@ create table if not exists leads (
   formatted_address text,
   lat double precision, lng double precision,
   sqft integer, property_type text, year_built integer,
-  roof_sqft integer, roof_pitch integer, size_source text,
+  roof_sqft integer, roof_pitch integer, footprint_sqft integer, size_source text,
   distance_miles double precision,
   nearest_area text,
   in_area boolean,
@@ -69,7 +69,7 @@ create table if not exists property_cache (
   formatted_address text,
   lat double precision, lng double precision, zip text,
   sqft integer, property_type text, year_built integer,
-  roof_sqft integer, roof_pitch integer, size_source text,
+  roof_sqft integer, roof_pitch integer, footprint_sqft integer, size_source text,
   looked_up_at timestamptz not null default now()
 );
 

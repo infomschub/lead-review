@@ -14,7 +14,7 @@ const zip5 = (z: string | null | undefined) => (z ?? "").trim().slice(0, 5);
 
 type GradeInput = Pick<
   Lead,
-  "property_status" | "lat" | "lng" | "zip" | "sqft" | "roof_sqft" | "property_type" | "address" | "city"
+  "property_status" | "lat" | "lng" | "zip" | "sqft" | "roof_sqft" | "footprint_sqft" | "property_type" | "address" | "city"
 >;
 
 export interface GradeResult {
@@ -91,9 +91,13 @@ export function gradeLead(client: Client, lead: GradeInput): GradeResult {
       bad.push(`Property type: ${lead.property_type}`);
     }
     if (roof) limit("Roof", lead.roof_sqft, client.min_roof_sqft, client.max_roof_sqft);
-    if (home) limit("Home", lead.sqft, client.min_sqft, client.max_sqft);
+    // Living area when we have it (Redfin/Zillow); otherwise the satellite footprint.
+    if (home)
+      lead.sqft != null || lead.footprint_sqft == null
+        ? limit("Home", lead.sqft, client.min_sqft, client.max_sqft)
+        : limit("Home footprint", lead.footprint_sqft, client.min_sqft, client.max_sqft);
   } else if (lead.property_status === "not_found") {
-    review.push(roof && home ? "No roof or home data for this address" : roof ? "No roof data for this address" : "Home not found on Redfin or Zillow");
+    review.push(roof && home ? "No roof or home data for this address" : roof ? "No roof data for this address" : "No home data for this address");
   } else if (lead.property_status === "error") {
     review.push("Lookup failed, will retry next run");
   } else if (lead.property_status === "pending") {

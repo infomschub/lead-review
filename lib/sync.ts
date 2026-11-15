@@ -72,11 +72,11 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
 
       // Size lookup: once per address per company type (cached), retried if the last try errored.
       if (!c.address && !c.city && !c.zip) {
-        Object.assign(row, { property_status: "no_address", sqft: null, roof_sqft: null, property_type: null, lat: null, lng: null });
+        Object.assign(row, { property_status: "no_address", sqft: null, roof_sqft: null, footprint_sqft: null, property_type: null, lat: null, lng: null });
       } else {
         // v2: lookups now refuse to measure when only the street/city/ZIP was found.
         // A lead with just a city or ZIP is still placed on the map for the area check.
-        const key = `v2:${client.company_type}:${addressKey(c)}`;
+        const key = `v3:${client.company_type}:${addressKey(c)}`;
         let p = await s.getCachedProperty(key);
         if (!p || p.status === "error") {
           p = await lookupProperty(fullAddress(c), client.company_type);
@@ -85,7 +85,7 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
         Object.assign(row, {
           property_status: p.status, formatted_address: p.formatted_address, lat: p.lat, lng: p.lng,
           sqft: p.sqft, property_type: p.property_type, year_built: p.year_built,
-          roof_sqft: p.roof_sqft, roof_pitch: p.roof_pitch, size_source: p.size_source,
+          roof_sqft: p.roof_sqft, roof_pitch: p.roof_pitch, footprint_sqft: p.footprint_sqft ?? null, size_source: p.size_source,
           zip: c.zip || p.zip,
         });
       }
