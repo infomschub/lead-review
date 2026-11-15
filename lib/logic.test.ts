@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { gradeLead } from "./grade.ts";
-import { deriveEngagement } from "./ghl.ts";
+import { deriveEngagement, bookedFromOpportunities, isBookedStageName } from "./ghl.ts";
 import { parseListing } from "./property.ts";
 import type { Client } from "./types.ts";
 
@@ -117,4 +117,19 @@ test("no address at all -> client setting", () => {
   const lead = { ...home, address: null, city: null, zip: null, lat: null, lng: null, property_status: "no_address" as const };
   assert.deepEqual(gradeLead(client, lead).reasons, ["No address on the lead"]);
   assert.equal(gradeLead({ ...client, incomplete_as: "bad" }, lead).grade, "bad");
+});
+
+const pipes = [{ id: "p1", name: "Sales", stages: [
+  { id: "s1", name: "New Lead" }, { id: "s2", name: "Contacted" }, { id: "s3", name: "Inspection Appointment Booked" },
+  { id: "s4", name: "Proposal Sent" }, { id: "s5", name: "Won" },
+] }];
+test("booked stage names", () => {
+  for (const n of ["Inspection Appointment Booked", "Design Consultation booked", "Consultation Booked", "Appointment Set"]) assert.ok(isBookedStageName(n), n);
+  for (const n of ["Not Booked", "New Lead", "Unbooked", "No-Booked"]) assert.ok(!isBookedStageName(n), n);
+});
+test("opportunity in or past booked stage = booked; before = not", () => {
+  assert.equal(bookedFromOpportunities([{ pipelineId: "p1", pipelineStageId: "s3" }], pipes)?.stage, "Inspection Appointment Booked");
+  assert.equal(bookedFromOpportunities([{ pipelineId: "p1", pipelineStageId: "s5" }], pipes)?.stage, "Won");
+  assert.equal(bookedFromOpportunities([{ pipelineId: "p1", pipelineStageId: "s2" }], pipes), null);
+  assert.equal(bookedFromOpportunities([{ pipelineId: "other", pipelineStageId: "s3" }], pipes), null);
 });

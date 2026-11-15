@@ -66,7 +66,7 @@ export function ClientForm({ client }: { client?: SafeClient }) {
           <h2 className="font-semibold">GoHighLevel connection</h2>
           <p className="hint">
             In the client&apos;s sub-account: Settings → Private Integrations → Create. Give it read access to Contacts,
-            Conversations, Conversation Messages, Calendars and Calendar Events, then paste the token here.
+            Conversations, Conversation Messages, Calendars, Calendar Events and Opportunities, then paste the token here.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

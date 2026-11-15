@@ -1,7 +1,8 @@
 /**
  * GoHighLevel (LeadConnector) API v2.
  * One Private Integration token per client sub-account, with scopes:
- *   contacts.readonly, conversations.readonly, conversations/message.readonly, calendars.readonly, calendars/events.readonly
+ *   contacts.readonly, conversations.readonly, conversations/message.readonly, calendars.readonly, calendars/events.readonly,
+ *   opportunities.readonly
  */
 const BASE = "https://services.leadconnectorhq.com";
 
@@ -189,27 +190,118 @@ export async function fetchBookings(token: string, locationId: string, since: Da
  * Messages are read per contact. Appointments come from `bookings` (the location-wide sweep) when it worked,
  * otherwise from the contact's own appointments endpoint. Errors are thrown, never treated as "not booked".
  */
+/**
+ * Replies and bookings are read independently: if the token can't read conversations,
+ * bookings still come through (and vice versa). Only the parts that worked are returned,
+ * so a refused permission never overwrites good data with "no".
+ */
 export async function fetchEngagement(
   token: string,
   locationId: string,
   contactId: string,
   bookings: Map<string, Appt[]> | null,
-): Promise<Engagement> {
-  const [convs, appts] = await Promise.all([
-    ghl<{ conversations: { id: string }[] }>(
+  pipelines: Pipeline[] | null = null,
+): Promise<{ fields: Partial<Engagement>; errors: string[] }> {
+  const errors: string[] = [];
+  const fail = (what: string) => (e: unknown) => {
+    errors.push(`${what}: ${e instanceof Error ? e.message.slice(0, 160) : e}`);
+    return null;
+  };
+
+  const readMessages = async () => {
+    const convs = await ghl<{ conversations: { id: string }[] }>(
       token,
       `/conversations/search?locationId=${encodeURIComponent(locationId)}&contactId=${encodeURIComponent(contactId)}`,
-    ),
+    );
+    const messages: Msg[] = [];
+    for (const c of (convs.conversations ?? []).slice(0, 3)) {
+      const data = await ghl<{ messages: { messages: Msg[] } }>(token, `/conversations/${c.id}/messages?limit=100`);
+      messages.push(...(data.messages?.messages ?? []));
+    }
+    return messages;
+  };
+
+  const [messages, appts, opps] = await Promise.all([
+    readMessages().catch(fail("Replies")),
     bookings
-      ? Promise.resolve({ events: bookings.get(contactId) ?? [] })
-      : ghl<{ events: Appt[] }>(token, `/contacts/${encodeURIComponent(contactId)}/appointments`),
+      ? Promise.resolve(bookings.get(contactId) ?? [])
+      : ghl<{ events: Appt[] }>(token, `/contacts/${encodeURIComponent(contactId)}/appointments`)
+          .then((d) => d.events ?? [])
+          .catch(fail("Appointments")),
+    pipelines?.length ? fetchOpportunities(token, locationId, contactId).catch(fail("Opportunities")) : Promise.resolve(null),
   ]);
-  const messages: Msg[] = [];
-  for (const c of (convs.conversations ?? []).slice(0, 3)) {
-    const data = await ghl<{ messages: { messages: Msg[] } }>(token, `/conversations/${c.id}/messages?limit=100`);
-    messages.push(...(data.messages?.messages ?? []));
+
+  const e = deriveEngagement(messages ?? [], appts ?? []);
+  const fields: Partial<Engagement> = {};
+  if (messages) {
+    Object.assign(fields, {
+      responsive: e.responsive, first_inbound_at: e.first_inbound_at,
+      client_responded: e.client_responded, first_response_at: e.first_response_at,
+    });
   }
-  return deriveEngagement(messages, appts.events ?? []);
+  // Calendar appointment first (it has the date); otherwise the opportunity stage.
+  const opp = opps && pipelines?.length ? bookedFromOpportunities(opps, pipelines) : null;
+  if (e.booked) {
+    Object.assign(fields, { booked: true, appointment_at: e.appointment_at, appointment_status: e.appointment_status });
+  } else if (opp) {
+    Object.assign(fields, { booked: true, appointment_at: null, appointment_status: opp.stage });
+  } else if (appts || opps) {
+    Object.assign(fields, { booked: false, appointment_at: null, appointment_status: null });
+  }
+  return { fields, errors };
+}
+
+// ---------- Opportunities (pipeline stages) ----------
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  stages: { id: string; name: string }[];
+}
+interface Opp {
+  pipelineId?: string;
+  pipelineStageId?: string;
+  status?: string;
+  updatedAt?: string;
+  lastStageChangeAt?: string;
+}
+
+/** Stage names that mean "an appointment was booked", e.g. "Inspection Appointment Booked", "Consultation Booked". */
+const BOOKED_STAGE = /\bbooked\b|\bappointment set\b|\bappt set\b|\bscheduled\b/i;
+const NOT_BOOKED_STAGE = /\b(not|un|no)[\s-]?booked\b|\bnot scheduled\b|\bunscheduled\b/i;
+export const isBookedStageName = (name: string) => BOOKED_STAGE.test(name) && !NOT_BOOKED_STAGE.test(name);
+
+export async function fetchPipelines(token: string, locationId: string): Promise<Pipeline[]> {
+  const data = await ghl<{ pipelines: Pipeline[] }>(token, `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`);
+  return data.pipelines ?? [];
+}
+
+/**
+ * Pure: is any of the contact's opportunities in a "booked" stage, or past one in the same pipeline
+ * (e.g. moved on to Proposal Sent or Won)? Returns the stage name it's in now.
+ */
+export function bookedFromOpportunities(opps: Opp[], pipelines: Pipeline[]): { stage: string; at: string | null } | null {
+  for (const o of opps) {
+    const p = pipelines.find((x) => x.id === o.pipelineId);
+    if (!p) continue;
+    const firstBooked = p.stages.findIndex((st) => isBookedStageName(st.name));
+    if (firstBooked < 0) continue;
+    const idx = p.stages.findIndex((st) => st.id === o.pipelineStageId);
+    if (idx < 0) continue;
+    const name = p.stages[idx].name;
+    if (isBookedStageName(name) || (idx > firstBooked && !NOT_BOOKED_STAGE.test(name))) {
+      return { stage: name, at: o.lastStageChangeAt ?? null };
+    }
+  }
+  return null;
+}
+
+async function fetchOpportunities(token: string, locationId: string, contactId: string): Promise<Opp[]> {
+  const data = await ghl<{ opportunities: Opp[] }>(
+    token,
+    `/opportunities/search?location_id=${encodeURIComponent(locationId)}&contact_id=${encodeURIComponent(contactId)}&limit=20`,
+  );
+  return data.opportunities ?? [];
 }
 
 /** Quick check used by the setup form's "Test connection" button. */

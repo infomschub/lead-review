@@ -193,7 +193,7 @@ export function LeadsTable({
                     {l.booked ? (
                       <>
                         <Yes on>Booked</Yes>
-                        <p className="text-xs text-stone-500">{fmtDate(l.appointment_at)}{l.appointment_status ? ` · ${l.appointment_status}` : ""}</p>
+                        <p className="text-xs text-stone-500">{[fmtDate(l.appointment_at), l.appointment_status].filter(Boolean).join(" · ")}</p>
                       </>
                     ) : (
                       <span className="text-stone-400">No</span>

@@ -1,12 +1,21 @@
 import type { Client, Lead } from "./types.ts";
 import { store, isDemo } from "./store.ts";
-import { fetchRecentContacts, fetchEngagement, fetchBookings, type Appt } from "./ghl.ts";
+import { fetchRecentContacts, fetchEngagement, fetchBookings, fetchPipelines, type Appt, type Pipeline } from "./ghl.ts";
 import { addressKey, fullAddress, lookupProperty } from "./property.ts";
 import { gradeLead } from "./grade.ts";
 
 /** Weekly run: last 7 days. "Sync now" on a client, or a client's first sync: last 30 days (fills the 14/30-day views). */
 export const SYNC_DAYS = 7;
 export const BACKFILL_DAYS = 30;
+
+/** Turn GHL's "not authorized for this scope" into what to tick on the Private Integration. */
+function scopeHint(err: string) {
+  if (!/not authorized for this scope|401/i.test(err)) return "";
+  if (err.startsWith("Replies")) return "Token needs Conversations + Conversation Messages read access. ";
+  if (err.startsWith("Appointments")) return "Token needs Calendar Events read access. ";
+  if (err.startsWith("Opportunities")) return "Token needs Opportunities read access. ";
+  return "";
+}
 
 async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
   let i = 0;
@@ -33,6 +42,13 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
     const contacts = await fetchRecentContacts(client.ghl_token, client.ghl_location_id, since);
     // Problems that don't stop the sync but the team should see on the client page.
     const warnings = new Set<string>();
+    let pipelines: Pipeline[] | null = null;
+    try {
+      pipelines = await fetchPipelines(client.ghl_token, client.ghl_location_id);
+    } catch (e) {
+      console.error("pipelines", e);
+      warnings.add(`Opportunities read failed, so pipeline "Booked" stages aren't counted (${e instanceof Error ? e.message.slice(0, 120) : e}). Give the token Opportunities read access.`);
+    }
     let bookings: Map<string, Appt[]> | null = null;
     try {
       bookings = await fetchBookings(client.ghl_token, client.ghl_location_id, since);
@@ -75,14 +91,9 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
       }
 
       // Engagement: refreshed every sync (conversations change daily).
-      try {
-        Object.assign(row, await fetchEngagement(client.ghl_token!, client.ghl_location_id, c.id, bookings), {
-          engagement_checked_at: new Date().toISOString(),
-        });
-      } catch (e) {
-        console.error("engagement", c.id, e);
-        warnings.add(`Replies/bookings not updated for some leads: ${e instanceof Error ? e.message.slice(0, 160) : e}`);
-      }
+      const { fields, errors } = await fetchEngagement(client.ghl_token!, client.ghl_location_id, c.id, bookings, pipelines);
+      Object.assign(row, fields, { engagement_checked_at: new Date().toISOString() });
+      for (const err of errors) warnings.add(`${scopeHint(err)}${err}`);
 
       Object.assign(row, gradeLead(client, row as Lead));
       delete (row as { id?: string }).id;
