@@ -14,7 +14,8 @@ export function ClientForm({ client }: { client?: SafeClient }) {
   const [testing, startTest] = useTransition();
   const types = client?.allowed_property_types?.length ? client.allowed_property_types : ["Single Family", "Townhouse"];
   const [kind, setKind] = useState<CompanyType>(client?.company_type ?? "roofing");
-  const roofing = kind === "roofing";
+  const roof = kind !== "home_improvement";
+  const home = kind !== "roofing";
 
   return (
     <form action={action} className="space-y-6">
@@ -34,10 +35,11 @@ export function ClientForm({ client }: { client?: SafeClient }) {
         </div>
         <fieldset>
           <legend className="label">Company type</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             {([
               ["roofing", "Roofing", "Judged on roof size, measured from Google satellite data."],
               ["home_improvement", "Home improvement", "Judged on home size and property type, scraped from Redfin and Zillow."],
+              ["both", "Both", "Roof and home are both measured. Set limits for either or both."],
             ] as const).map(([value, title, desc]) => (
               <label
                 key={value}
@@ -57,7 +59,7 @@ export function ClientForm({ client }: { client?: SafeClient }) {
           <h2 className="font-semibold">GoHighLevel connection</h2>
           <p className="hint">
             In the client&apos;s sub-account: Settings → Private Integrations → Create. Give it read access to Contacts,
-            Conversations, Conversation Messages and Calendar Events, then paste the token here.
+            Conversations, Conversation Messages, Calendars and Calendar Events, then paste the token here.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -108,22 +110,39 @@ export function ClientForm({ client }: { client?: SafeClient }) {
         </div>
       </section>
 
-      <section className="card space-y-4">
+      <section className="card space-y-4" hidden={!roof}>
         <div>
-          <h2 className="font-semibold">{roofing ? "Roof size" : "Home"}</h2>
-          {roofing && <p className="hint">Total roof surface area in sq ft (all roof sections, measured along the slope).</p>}
+          <h2 className="font-semibold">Roof size</h2>
+          <p className="hint">Total roof surface area in sq ft (all roof sections, measured along the slope). Leave blank for no limit.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="min">Minimum {roofing ? "roof" : "home"} sq ft</label>
+            <label className="label" htmlFor="rmin">Minimum roof sq ft</label>
+            <input id="rmin" name="min_roof_sqft" inputMode="numeric" className="input" defaultValue={client?.min_roof_sqft ?? ""} placeholder="No minimum" />
+          </div>
+          <div>
+            <label className="label" htmlFor="rmax">Maximum roof sq ft</label>
+            <input id="rmax" name="max_roof_sqft" inputMode="numeric" className="input" defaultValue={client?.max_roof_sqft ?? ""} placeholder="No maximum" />
+          </div>
+        </div>
+      </section>
+
+      <section className="card space-y-4" hidden={!home}>
+        <div>
+          <h2 className="font-semibold">Home</h2>
+          <p className="hint">Living area in sq ft. Leave blank for no limit.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="min">Minimum home sq ft</label>
             <input id="min" name="min_sqft" inputMode="numeric" className="input" defaultValue={client?.min_sqft ?? ""} placeholder="No minimum" />
           </div>
           <div>
-            <label className="label" htmlFor="max">Maximum {roofing ? "roof" : "home"} sq ft</label>
+            <label className="label" htmlFor="max">Maximum home sq ft</label>
             <input id="max" name="max_sqft" inputMode="numeric" className="input" defaultValue={client?.max_sqft ?? ""} placeholder="No maximum" />
           </div>
         </div>
-        <fieldset hidden={roofing}>
+        <fieldset>
           <legend className="label">Accepted property types</legend>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {PROPERTY_TYPES.map((t) => (
@@ -135,6 +154,9 @@ export function ClientForm({ client }: { client?: SafeClient }) {
           </div>
           <p className="hint">Untick all to accept any type.</p>
         </fieldset>
+      </section>
+
+      <section className="card space-y-4">
         <div>
           <label className="label" htmlFor="notes">Notes for the team</label>
           <textarea id="notes" name="notes" rows={2} className="input" defaultValue={client?.notes ?? ""} />

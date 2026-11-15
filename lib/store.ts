@@ -100,7 +100,7 @@ class MemoryStore implements Store {
     const created: Client = {
       id: crypto.randomUUID(), company_type: "roofing", active: true, ghl_location_id: "", ghl_token: null, target_zips: [],
       center_address: null, center_lat: null, center_lng: null, radius_miles: null, min_sqft: null,
-      max_sqft: null, allowed_property_types: [], notes: null, last_synced_at: null, last_sync_error: null,
+      max_sqft: null, min_roof_sqft: null, max_roof_sqft: null, allowed_property_types: [], notes: null, last_synced_at: null, last_sync_error: null,
       created_at: new Date().toISOString(), ...c,
     };
     this.clients.push(created);

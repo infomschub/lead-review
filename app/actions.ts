@@ -46,7 +46,10 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
     else return { error: `Couldn't find that center address. Google said: ${lastGeocodeError ?? "no result"}` };
   }
 
-  const company_type: CompanyType = formData.get("company_type") === "home_improvement" ? "home_improvement" : "roofing";
+  const ct = String(formData.get("company_type") ?? "");
+  const company_type: CompanyType = ct === "home_improvement" || ct === "both" ? ct : "roofing";
+  const roof = company_type !== "home_improvement";
+  const home = company_type !== "roofing";
   const tokenIn = String(formData.get("ghl_token") ?? "").trim();
   const client: Partial<Client> & { name: string } = {
     ...(id ? { id } : {}),
@@ -64,9 +67,11 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
     center_lat,
     center_lng,
     radius_miles: centerAddress ? num(formData.get("radius_miles")) : null,
-    min_sqft: num(formData.get("min_sqft")),
-    max_sqft: num(formData.get("max_sqft")),
-    allowed_property_types: company_type === "roofing" ? [] : formData.getAll("allowed_property_types").map(String),
+    min_sqft: home ? num(formData.get("min_sqft")) : null,
+    max_sqft: home ? num(formData.get("max_sqft")) : null,
+    min_roof_sqft: roof ? num(formData.get("min_roof_sqft")) : null,
+    max_roof_sqft: roof ? num(formData.get("max_roof_sqft")) : null,
+    allowed_property_types: home ? formData.getAll("allowed_property_types").map(String) : [],
     notes: String(formData.get("notes") ?? "").trim() || null,
   };
   const saved = await s.saveClient(client);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { finalGrade, sizeLabel, type CompanyType, type Grade, type Lead } from "@/lib/types";
+import { checksHome, checksRoof, finalGrade, sizeLabel, type CompanyType, type Grade, type Lead } from "@/lib/types";
 import { responseMinutes, fmtMinutes } from "@/lib/stats";
 import { GradePill, GRADE_LABEL } from "./ui";
 import { overrideLead } from "@/app/actions";
@@ -52,7 +52,8 @@ function csv(leads: Lead[]) {
 export function LeadsTable({
   leads, clientId, clientName, companyType,
 }: { leads: Lead[]; clientId: string; clientName: string; companyType: CompanyType }) {
-  const roofing = companyType === "roofing";
+  const showRoof = checksRoof(companyType);
+  const showHome = checksHome(companyType);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -138,19 +139,27 @@ export function LeadsTable({
                     {l.distance_miles != null && <p className="text-xs text-stone-500">{l.distance_miles} mi from center</p>}
                   </td>
                   <td className="px-3 py-3 text-right">
-                    {(() => {
-                      const size = roofing ? l.roof_sqft : l.sqft;
-                      const details = roofing
-                        ? [l.roof_pitch != null && `${l.roof_pitch}° pitch`]
-                        : [l.property_type, l.year_built && `built ${l.year_built}`];
-                      return (
-                        <>
-                          {size != null ? <p className="font-medium tabular-nums">{size.toLocaleString()} sq ft</p> : <p className="text-stone-400">–</p>}
-                          <p className="text-xs text-stone-500">{details.filter(Boolean).join(" · ")}</p>
-                          {l.size_source && <p className="text-xs text-stone-400">via {l.size_source}</p>}
-                        </>
-                      );
-                    })()}
+                    {showRoof && (
+                      <>
+                        {l.roof_sqft != null ? (
+                          <p className="font-medium tabular-nums">{l.roof_sqft.toLocaleString()} sq ft{showHome && <span className="font-normal text-stone-500"> roof</span>}</p>
+                        ) : (
+                          <p className="text-stone-400">–{showHome && " roof"}</p>
+                        )}
+                        {l.roof_pitch != null && <p className="text-xs text-stone-500">{l.roof_pitch}° pitch</p>}
+                      </>
+                    )}
+                    {showHome && (
+                      <div className={showRoof ? "mt-1" : ""}>
+                        {l.sqft != null ? (
+                          <p className="font-medium tabular-nums">{l.sqft.toLocaleString()} sq ft{showRoof && <span className="font-normal text-stone-500"> home</span>}</p>
+                        ) : (
+                          <p className="text-stone-400">–{showRoof && " home"}</p>
+                        )}
+                        <p className="text-xs text-stone-500">{[l.property_type, l.year_built && `built ${l.year_built}`].filter(Boolean).join(" · ")}</p>
+                      </div>
+                    )}
+                    {l.size_source && <p className="text-xs text-stone-400">via {l.size_source}</p>}
                   </td>
                   <td className="max-w-[260px] px-3 py-3">
                     <GradePill grade={g} overridden={!!l.override_grade} />

@@ -3,7 +3,7 @@
 create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  company_type text not null default 'roofing' check (company_type in ('roofing','home_improvement')),
+  company_type text not null default 'roofing' check (company_type in ('roofing','home_improvement','both')),
   active boolean not null default true,
   ghl_location_id text not null default '',
   ghl_token text,
@@ -12,8 +12,10 @@ create table if not exists clients (
   center_lat double precision,
   center_lng double precision,
   radius_miles double precision,
-  min_sqft integer,
+  min_sqft integer,        -- home sq ft
   max_sqft integer,
+  min_roof_sqft integer,   -- roof sq ft
+  max_roof_sqft integer,
   allowed_property_types text[] not null default '{}',
   notes text,
   last_synced_at timestamptz,

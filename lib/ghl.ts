@@ -1,7 +1,7 @@
 /**
  * GoHighLevel (LeadConnector) API v2.
  * One Private Integration token per client sub-account, with scopes:
- *   contacts.readonly, conversations.readonly, conversations/message.readonly, calendars/events.readonly
+ *   contacts.readonly, conversations.readonly, conversations/message.readonly, calendars.readonly, calendars/events.readonly
  */
 const BASE = "https://services.leadconnectorhq.com";
 
@@ -154,13 +154,55 @@ export function deriveEngagement(messages: Msg[], events: { startTime?: string; 
   };
 }
 
-export async function fetchEngagement(token: string, locationId: string, contactId: string): Promise<Engagement> {
+export interface Appt {
+  contactId?: string;
+  startTime?: string;
+  appointmentStatus?: string;
+}
+
+/**
+ * Every appointment on every calendar in the sub-account between `since` and 120 days ahead,
+ * grouped by contact. One sweep per sync instead of one call per lead, and it sees appointments
+ * on all calendars (round-robin, team and personal).
+ */
+export async function fetchBookings(token: string, locationId: string, since: Date) {
+  const byContact = new Map<string, Appt[]>();
+  const cals = await ghl<{ calendars: { id: string }[] }>(token, `/calendars/?locationId=${encodeURIComponent(locationId)}`);
+  const start = since.getTime() - 864e5;
+  const end = Date.now() + 120 * 864e5;
+  for (const cal of cals.calendars ?? []) {
+    const data = await ghl<{ events: Appt[] }>(
+      token,
+      `/calendars/events?locationId=${encodeURIComponent(locationId)}&calendarId=${encodeURIComponent(cal.id)}&startTime=${start}&endTime=${end}`,
+    );
+    for (const e of data.events ?? []) {
+      if (!e.contactId) continue;
+      const list = byContact.get(e.contactId) ?? [];
+      list.push(e);
+      byContact.set(e.contactId, list);
+    }
+  }
+  return byContact;
+}
+
+/**
+ * Messages are read per contact. Appointments come from `bookings` (the location-wide sweep) when it worked,
+ * otherwise from the contact's own appointments endpoint. Errors are thrown, never treated as "not booked".
+ */
+export async function fetchEngagement(
+  token: string,
+  locationId: string,
+  contactId: string,
+  bookings: Map<string, Appt[]> | null,
+): Promise<Engagement> {
   const [convs, appts] = await Promise.all([
     ghl<{ conversations: { id: string }[] }>(
       token,
       `/conversations/search?locationId=${encodeURIComponent(locationId)}&contactId=${encodeURIComponent(contactId)}`,
     ),
-    ghl<{ events: any[] }>(token, `/contacts/${encodeURIComponent(contactId)}/appointments`).catch(() => ({ events: [] })),
+    bookings
+      ? Promise.resolve({ events: bookings.get(contactId) ?? [] })
+      : ghl<{ events: Appt[] }>(token, `/contacts/${encodeURIComponent(contactId)}/appointments`),
   ]);
   const messages: Msg[] = [];
   for (const c of (convs.conversations ?? []).slice(0, 3)) {

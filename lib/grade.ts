@@ -1,4 +1,4 @@
-import { measuredSize, type Client, type Grade, type Lead } from "./types.ts";
+import { checksHome, checksRoof, type Client, type Grade, type Lead } from "./types.ts";
 
 export function haversineMiles(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 3958.8;
@@ -57,24 +57,23 @@ export function gradeLead(client: Client, lead: GradeInput): GradeResult {
     review.push("Couldn't place the address on a map");
   }
 
-  const roofing = client.company_type === "roofing";
-  const what = roofing ? "Roof" : "Home";
+  const roof = checksRoof(client.company_type);
+  const home = checksHome(client.company_type);
+  const limit = (what: string, size: number | null, min: number | null, max: number | null) => {
+    if (min == null && max == null) return;
+    if (size == null) return review.push(`${what} size not found`);
+    if (min != null && size < min) bad.push(`${what} too small (${size.toLocaleString()} sq ft, min ${min.toLocaleString()})`);
+    if (max != null && size > max) bad.push(`${what} too large (${size.toLocaleString()} sq ft, max ${max.toLocaleString()})`);
+  };
   if (lead.property_status === "found") {
     const allowed = client.allowed_property_types;
-    if (!roofing && lead.property_type && allowed.length > 0 && !allowed.includes(lead.property_type)) {
+    if (home && lead.property_type && allowed.length > 0 && !allowed.includes(lead.property_type)) {
       bad.push(`Property type: ${lead.property_type}`);
     }
-    const size = measuredSize(client, lead);
-    if (size == null) {
-      review.push(`${what} size not found`);
-    } else {
-      if (client.min_sqft != null && size < client.min_sqft)
-        bad.push(`${what} too small (${size.toLocaleString()} sq ft, min ${client.min_sqft.toLocaleString()})`);
-      if (client.max_sqft != null && size > client.max_sqft)
-        bad.push(`${what} too large (${size.toLocaleString()} sq ft, max ${client.max_sqft.toLocaleString()})`);
-    }
+    if (roof) limit("Roof", lead.roof_sqft, client.min_roof_sqft, client.max_roof_sqft);
+    if (home) limit("Home", lead.sqft, client.min_sqft, client.max_sqft);
   } else if (lead.property_status === "not_found") {
-    review.push(roofing ? "No roof data for this address" : "Home not found on Redfin or Zillow");
+    review.push(roof && home ? "No roof or home data for this address" : roof ? "No roof data for this address" : "Home not found on Redfin or Zillow");
   } else if (lead.property_status === "error") {
     review.push("Lookup failed, will retry next run");
   } else if (lead.property_status === "pending") {

@@ -159,30 +159,50 @@ async function zillow(address: string) {
   return facts.sqft ? { ...facts, size_source: "Zillow" } : null;
 }
 
+async function lookupHome(address: string) {
+  let lastErr: unknown = null;
+  for (const src of [redfin, zillow]) {
+    try {
+      const home = await src(address);
+      if (home) return { home, error: null };
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  if (lastErr) console.error("home scrape", lastErr);
+  return { home: null, error: lastErr };
+}
+
+/**
+ * roofing: roof only. home_improvement: home only. both: roof and home.
+ * status is "found" when at least one measurement came back.
+ */
 export async function lookupProperty(address: string, type: CompanyType): Promise<PropertyResult> {
   try {
     const g = await geocode(address);
     const placed: PropertyResult = { ...EMPTY, ...(g ?? {}) };
+    const sources: string[] = [];
+    let out: PropertyResult = placed;
+    let failed = false;
 
-    if (type === "roofing") {
-      if (!g) return placed;
+    if (type !== "home_improvement" && g) {
       const roof = await solarRoof(g.lat, g.lng);
-      return roof ? { ...placed, ...roof, status: "found", size_source: "Google Solar" } : placed;
-    }
-
-    let home = null;
-    let lastErr: unknown = null;
-    for (const src of [redfin, zillow]) {
-      try {
-        home = await src(address);
-        if (home) break;
-      } catch (e) {
-        lastErr = e;
+      if (roof) {
+        out = { ...out, ...roof };
+        sources.push("Google Solar");
       }
     }
-    if (home) return { ...placed, ...home, status: "found" };
-    if (lastErr) console.error("home scrape", lastErr);
-    return lastErr ? { ...placed, status: "error" } : placed;
+    if (type !== "roofing") {
+      const { home, error } = await lookupHome(address);
+      if (home) {
+        const { size_source, ...facts } = home;
+        out = { ...out, ...facts };
+        sources.push(size_source);
+      } else if (error) failed = true;
+    }
+
+    if (sources.length) return { ...out, status: "found", size_source: sources.join(" + ") };
+    return failed ? { ...out, status: "error" } : out;
   } catch (e) {
     console.error("property lookup", e);
     return { ...EMPTY, status: "error" };

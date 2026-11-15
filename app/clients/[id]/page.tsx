@@ -5,21 +5,24 @@ import { tally } from "@/lib/stats";
 import { TallyTiles, RangeTabs, timeAgo } from "@/components/ui";
 import { SyncButton } from "@/components/SyncButton";
 import { LeadsTable } from "@/components/LeadsTable";
-import { COMPANY_LABEL, type Client } from "@/lib/types";
+import { COMPANY_LABEL, checksHome, checksRoof, type Client } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 function targetingSummary(c: Client) {
   const parts: string[] = [COMPANY_LABEL[c.company_type]];
-  const what = c.company_type === "roofing" ? "roof" : "home";
   if (c.center_address && c.radius_miles) parts.push(`Within ${c.radius_miles} mi of ${c.center_address}`);
   if (c.target_zips.length) parts.push(`${c.target_zips.length} ZIP code${c.target_zips.length === 1 ? "" : "s"}`);
   if (parts.length === 1) parts.push("Any location");
-  if (c.min_sqft && c.max_sqft) parts.push(`${c.min_sqft.toLocaleString()}–${c.max_sqft.toLocaleString()} sq ft ${what}`);
-  else if (c.min_sqft) parts.push(`${c.min_sqft.toLocaleString()}+ sq ft ${what}`);
-  else if (c.max_sqft) parts.push(`Up to ${c.max_sqft.toLocaleString()} sq ft ${what}`);
-  if (c.company_type === "home_improvement")
+  const range = (what: string, min: number | null, max: number | null) => {
+    if (min && max) parts.push(`${min.toLocaleString()}–${max.toLocaleString()} sq ft ${what}`);
+    else if (min) parts.push(`${min.toLocaleString()}+ sq ft ${what}`);
+    else if (max) parts.push(`Up to ${max.toLocaleString()} sq ft ${what}`);
+  };
+  if (checksRoof(c.company_type)) range("roof", c.min_roof_sqft, c.max_roof_sqft);
+  if (checksHome(c.company_type)) range("home", c.min_sqft, c.max_sqft);
+  if (checksHome(c.company_type))
     parts.push(c.allowed_property_types.length ? c.allowed_property_types.join(" / ") : "Any property type");
   return parts;
 }

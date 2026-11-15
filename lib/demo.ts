@@ -24,20 +24,20 @@ export function demoData(): { clients: Client[]; leads: Lead[] } {
     {
       ...base, id: "demo-summit", name: "Summit Roofing Co.", company_type: "roofing", ghl_location_id: "demo-loc-1",
       center_address: "Denver, CO", center_lat: 39.7392, center_lng: -104.9903, radius_miles: 30,
-      target_zips: [], min_sqft: 1600, max_sqft: null, allowed_property_types: [],
+      target_zips: [], min_sqft: null, max_sqft: null, min_roof_sqft: 1600, max_roof_sqft: null, allowed_property_types: [],
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 90 * 864e5).toISOString(),
     },
     {
       ...base, id: "demo-coastal", name: "Coastal Home Remodeling", company_type: "home_improvement", ghl_location_id: "demo-loc-2",
       center_address: null, center_lat: null, center_lng: null, radius_miles: null,
       target_zips: ["33602", "33606", "33609", "33611", "33629", "33618", "33647", "33626"],
-      min_sqft: 1800, max_sqft: 6000,
+      min_sqft: 1800, max_sqft: 6000, min_roof_sqft: null, max_roof_sqft: null,
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 60 * 864e5).toISOString(),
     },
     {
       ...base, id: "demo-prairie", name: "Prairie Roofing & Gutters", company_type: "roofing", ghl_location_id: "demo-loc-3",
       center_address: "Omaha, NE", center_lat: 41.2565, center_lng: -95.9345, radius_miles: 40,
-      target_zips: [], min_sqft: 1400, max_sqft: null, allowed_property_types: [],
+      target_zips: [], min_sqft: null, max_sqft: null, min_roof_sqft: 1400, max_roof_sqft: null, allowed_property_types: [],
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 30 * 864e5).toISOString(),
     },
   ];

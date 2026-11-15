@@ -1,6 +1,6 @@
 import type { Client, Lead } from "./types.ts";
 import { store, isDemo } from "./store.ts";
-import { fetchRecentContacts, fetchEngagement } from "./ghl.ts";
+import { fetchRecentContacts, fetchEngagement, fetchBookings, type Appt } from "./ghl.ts";
 import { addressKey, fullAddress, lookupProperty } from "./property.ts";
 import { gradeLead } from "./grade.ts";
 
@@ -31,6 +31,15 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
     const window = days ?? (client.last_synced_at ? SYNC_DAYS : BACKFILL_DAYS);
     const since = new Date(Date.now() - window * 864e5);
     const contacts = await fetchRecentContacts(client.ghl_token, client.ghl_location_id, since);
+    // Problems that don't stop the sync but the team should see on the client page.
+    const warnings = new Set<string>();
+    let bookings: Map<string, Appt[]> | null = null;
+    try {
+      bookings = await fetchBookings(client.ghl_token, client.ghl_location_id, since);
+    } catch (e) {
+      console.error("bookings sweep", e);
+      warnings.add(`Calendar read failed, used per-contact appointments instead (${e instanceof Error ? e.message.slice(0, 120) : e}). Check the token has Calendars + Calendar Events read access.`);
+    }
     const existing = new Map(
       (await s.getLeadsByContactIds(client.id, contacts.map((c) => c.id))).map((l) => [l.ghl_contact_id, l]),
     );
@@ -65,11 +74,12 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
 
       // Engagement: refreshed every sync (conversations change daily).
       try {
-        Object.assign(row, await fetchEngagement(client.ghl_token!, client.ghl_location_id, c.id), {
+        Object.assign(row, await fetchEngagement(client.ghl_token!, client.ghl_location_id, c.id, bookings), {
           engagement_checked_at: new Date().toISOString(),
         });
       } catch (e) {
         console.error("engagement", c.id, e);
+        warnings.add(`Replies/bookings not updated for some leads: ${e instanceof Error ? e.message.slice(0, 160) : e}`);
       }
 
       Object.assign(row, gradeLead(client, row as Lead));
@@ -78,7 +88,11 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
     });
 
     await s.upsertLeads(rows);
-    await s.saveClient({ ...client, last_synced_at: new Date().toISOString(), last_sync_error: null });
+    await s.saveClient({
+      ...client,
+      last_synced_at: new Date().toISOString(),
+      last_sync_error: warnings.size ? [...warnings].join(" · ") : null,
+    });
     return { leads: rows.length };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

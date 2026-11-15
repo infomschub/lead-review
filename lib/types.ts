@@ -1,9 +1,15 @@
 export type Grade = "good" | "bad" | "review";
 
 /** Roofing clients are judged on roof size (Google Solar). Home improvement on home size (scraped from listing sites). */
-export type CompanyType = "roofing" | "home_improvement";
-export const COMPANY_LABEL: Record<CompanyType, string> = { roofing: "Roofing", home_improvement: "Home improvement" };
-export const sizeLabel = (t: CompanyType) => (t === "roofing" ? "Roof size" : "Home size");
+export type CompanyType = "roofing" | "home_improvement" | "both";
+export const COMPANY_LABEL: Record<CompanyType, string> = {
+  roofing: "Roofing",
+  home_improvement: "Home improvement",
+  both: "Roofing + home improvement",
+};
+export const sizeLabel = (t: CompanyType) => (t === "roofing" ? "Roof size" : t === "home_improvement" ? "Home size" : "Roof / home size");
+export const checksRoof = (t: CompanyType) => t !== "home_improvement";
+export const checksHome = (t: CompanyType) => t !== "roofing";
 
 export const PROPERTY_TYPES = [
   "Single Family",
@@ -32,9 +38,12 @@ export interface Client {
   center_lat: number | null;
   center_lng: number | null;
   radius_miles: number | null;
-  /** Applies to roof sq ft for roofing clients, home sq ft for home improvement. */
+  /** Home (living area) sq ft limits: home improvement and both. */
   min_sqft: number | null;
   max_sqft: number | null;
+  /** Roof sq ft limits: roofing and both. */
+  min_roof_sqft: number | null;
+  max_roof_sqft: number | null;
   /** Home improvement only. Empty = any property type allowed. */
   allowed_property_types: string[];
   notes: string | null;
@@ -108,6 +117,3 @@ export interface PropertyResult {
 
 export const finalGrade = (l: Pick<Lead, "grade" | "override_grade">): Grade =>
   l.override_grade ?? l.grade;
-
-export const measuredSize = (c: Pick<Client, "company_type">, l: Pick<Lead, "sqft" | "roof_sqft">) =>
-  c.company_type === "roofing" ? l.roof_sqft : l.sqft;

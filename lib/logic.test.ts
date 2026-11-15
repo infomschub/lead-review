@@ -8,7 +8,7 @@ import type { Client } from "./types.ts";
 const client: Client = {
   id: "c", name: "T", company_type: "home_improvement", active: true, ghl_location_id: "", ghl_token: null, target_zips: ["80202"],
   center_address: "Denver", center_lat: 39.7392, center_lng: -104.9903, radius_miles: 20,
-  min_sqft: 1400, max_sqft: 5000, allowed_property_types: ["Single Family"], notes: null,
+  min_sqft: 1400, max_sqft: 5000, min_roof_sqft: null, max_roof_sqft: null, allowed_property_types: ["Single Family"], notes: null,
   last_synced_at: null, last_sync_error: null, created_at: "",
 };
 const home = { property_status: "found" as const, address: "1 Main", lat: 39.75, lng: -104.98, zip: "80203", sqft: 2200, roof_sqft: null, property_type: "Single Family" };
@@ -56,7 +56,7 @@ test("form activity is not a reply; cancelled appt not booked", () => {
   assert.deepEqual([e.responsive, e.booked], [false, false]);
 });
 
-const roofer: Client = { ...client, company_type: "roofing", min_sqft: 1500, max_sqft: null, allowed_property_types: [] };
+const roofer: Client = { ...client, company_type: "roofing", min_sqft: null, max_sqft: null, min_roof_sqft: 1500, allowed_property_types: [] };
 test("roofing uses roof size, ignores property type", () => {
   assert.equal(gradeLead(roofer, { ...home, sqft: null, roof_sqft: 2400, property_type: null }).grade, "good");
   assert.match(gradeLead(roofer, { ...home, roof_sqft: 1100 }).reasons[0], /Roof too small/);
@@ -68,4 +68,18 @@ test("parse Zillow-style JSON", () => {
 test("parse Redfin-style HTML", () => {
   const p = parseListing('<span class="statsValue">1,840</span><span class="statsLabel">Sq Ft</span> <span>Property Type</span><span class="v">Townhouse</span> Built in 2004');
   assert.deepEqual(p, { sqft: 1840, property_type: "Townhouse", year_built: 2004 });
+});
+
+const both: Client = { ...client, company_type: "both", min_roof_sqft: 1500 };
+test("both: checks roof and home limits", () => {
+  assert.equal(gradeLead(both, { ...home, roof_sqft: 2400 }).grade, "good");
+  assert.match(gradeLead(both, { ...home, roof_sqft: 900 }).reasons.join(), /Roof too small/);
+  assert.match(gradeLead(both, { ...home, roof_sqft: 2400, sqft: 900 }).reasons.join(), /Home too small/);
+  assert.equal(gradeLead(both, { ...home, roof_sqft: 2400, property_type: "Condo" }).grade, "bad");
+});
+test("both: missing roof with a roof limit -> review", () =>
+  assert.match(gradeLead(both, { ...home, roof_sqft: null }).reasons.join(), /Roof size not found/));
+test("appointments from location sweep count as booked", () => {
+  const e = deriveEngagement([], [{ startTime: t(500), appointmentStatus: "confirmed" }, { startTime: t(100), appointmentStatus: "cancelled" }]);
+  assert.deepEqual([e.booked, e.appointment_at], [true, t(500)]);
 });
