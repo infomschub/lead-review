@@ -86,7 +86,7 @@ export async function deleteClient(formData: FormData) {
 export async function syncNow(clientId?: string) {
   if (clientId) {
     const c = await store().getClient(clientId);
-    if (c) await syncClient(c);
+    if (c) await syncClient(c, 30);
   } else {
     await syncAll();
   }

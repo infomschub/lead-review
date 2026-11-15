@@ -6,6 +6,7 @@ import { TallyTiles, QualityBar, RangeTabs, timeAgo } from "@/components/ui";
 import { SyncButton } from "@/components/SyncButton";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export default async function Overview({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const days = [7, 14, 30].includes(Number((await searchParams).days)) ? Number((await searchParams).days) : 7;

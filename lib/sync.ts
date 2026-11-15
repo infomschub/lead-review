@@ -4,7 +4,9 @@ import { fetchRecentContacts, fetchEngagement } from "./ghl.ts";
 import { addressKey, fullAddress, lookupProperty } from "./property.ts";
 import { gradeLead } from "./grade.ts";
 
+/** Weekly run: last 7 days. "Sync now" on a client, or a client's first sync: last 30 days (fills the 14/30-day views). */
 export const SYNC_DAYS = 7;
+export const BACKFILL_DAYS = 30;
 
 async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
   let i = 0;
@@ -14,7 +16,7 @@ async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
 }
 
 /** Pull last-7-day leads from GHL, measure roof or home, refresh engagement, grade. */
-export async function syncClient(client: Client): Promise<{ leads: number; error?: string }> {
+export async function syncClient(client: Client, days?: number): Promise<{ leads: number; error?: string }> {
   const s = store();
 
   if (isDemo() || !client.ghl_token || !client.ghl_location_id) {
@@ -26,7 +28,8 @@ export async function syncClient(client: Client): Promise<{ leads: number; error
   }
 
   try {
-    const since = new Date(Date.now() - SYNC_DAYS * 864e5);
+    const window = days ?? (client.last_synced_at ? SYNC_DAYS : BACKFILL_DAYS);
+    const since = new Date(Date.now() - window * 864e5);
     const contacts = await fetchRecentContacts(client.ghl_token, client.ghl_location_id, since);
     const existing = new Map(
       (await s.getLeadsByContactIds(client.id, contacts.map((c) => c.id))).map((l) => [l.ghl_contact_id, l]),

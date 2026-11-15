@@ -8,6 +8,7 @@ import { LeadsTable } from "@/components/LeadsTable";
 import { COMPANY_LABEL, type Client } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 function targetingSummary(c: Client) {
   const parts: string[] = [COMPANY_LABEL[c.company_type]];
