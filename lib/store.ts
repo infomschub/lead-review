@@ -19,6 +19,24 @@ export interface Store {
   cacheProperty(key: string, p: PropertyResult): Promise<void>;
 }
 
+/** Which database updates (supabase/migrations) are still missing, by probing a column each one adds. */
+export async function missingMigrations(): Promise<string[]> {
+  if (isDemo()) return [];
+  const db = (store() as unknown as { db: import("@supabase/supabase-js").SupabaseClient }).db;
+  const checks: [string, string, string][] = [
+    ["002_both_type_and_roof_limits.sql", "clients", "min_roof_sqft"],
+    ["003_multiple_pins_and_incomplete.sql", "clients", "areas"],
+    ["004_footprint.sql", "leads", "footprint_sqft"],
+    ["005_client_status.sql", "clients", "status"],
+  ];
+  const missing: string[] = [];
+  for (const [file, table, col] of checks) {
+    const { error } = await db.from(table).select(col).limit(1);
+    if (error) missing.push(file);
+  }
+  return missing;
+}
+
 export const isDemo = () => !(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // ---------- Supabase ----------

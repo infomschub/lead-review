@@ -78,7 +78,18 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
     allowed_property_types: home ? formData.getAll("allowed_property_types").map(String) : [],
     notes: String(formData.get("notes") ?? "").trim() || null,
   };
-  const saved = await s.saveClient(client);
+  let saved: Client;
+  try {
+    saved = await s.saveClient(client);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const col = msg.match(/Could not find the '(\w+)' column/)?.[1];
+    return {
+      error: col
+        ? `Couldn't save: the database is missing the "${col}" field. Run the pending SQL updates in Supabase (supabase/migrations, in order), then save again.`
+        : `Couldn't save: ${msg}`,
+    };
+  }
 
   // Re-grade existing leads against the new targeting right away.
   const leads = await s.listLeads(saved.id, new Date(Date.now() - 90 * 864e5).toISOString());
