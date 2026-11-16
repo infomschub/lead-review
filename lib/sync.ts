@@ -115,7 +115,7 @@ export async function syncClient(client: Client, days?: number): Promise<{ leads
 }
 
 export async function syncAll() {
-  const clients = (await store().listClients()).filter((c) => c.status === "active");
+  const clients = (await store().listClients()).filter((c) => (c.status ?? "active") === "active");
   const results: Record<string, { leads: number; error?: string }> = {};
   for (const c of clients) results[c.name] = await syncClient(c);
   return results;
