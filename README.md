@@ -41,7 +41,7 @@ CRON_SECRET=                # any long random string; Vercel Cron sends it autom
 
 5. **For each client**: click "Add client". In their GHL sub-account go to Settings → Private Integrations → Create a token with read access to Contacts, Conversations, Conversation Messages, Calendars, Calendar Events and Opportunities. Paste the token and the location ID, click **Test connection**, then set the targeting.
 
-The weekly run is set in `vercel.json` as `0 23 * * 0`: Sunday 23:00 UTC, which is Monday 7:00 AM in the Philippines. "Sync now" on a client page pulls the last 30 days for that client, and a new client's first sync does the same, so the 14- and 30-day views are filled in. The weekly run pulls the last 7 days. Without Supabase keys the app runs in demo mode with sample data.
+The weekly run is set in `vercel.json` as `0 23 * * 0`: Sunday 23:00 UTC, which is Monday 7:00 AM in the Philippines. "Sync now" on a client page pulls the last 30 days for that client, and a new client's first sync does the same, so the 14- and 30-day views are filled in. The weekly run pulls the last 7 days. Clients are Active (synced every Monday), Paused or Lost (kept for history, not synced); the sidebar groups them by status. Without Supabase keys the app runs in demo mode with sample data.
 
 ## Dev
 

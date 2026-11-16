@@ -42,7 +42,9 @@ class SupabaseStore implements Store {
     return this.check(await this.db.from("clients").select("*").eq("id", id).maybeSingle()) as Client | null;
   }
   async saveClient(c: Partial<Client> & { name: string }) {
-    return this.check(await this.db.from("clients").upsert(c).select().single()) as Client;
+    // Keep the old `active` column in step with status (older rows/tools may read it).
+    const row = c.status ? { ...c, active: c.status === "active" } : c;
+    return this.check(await this.db.from("clients").upsert(row).select().single()) as Client;
   }
   async deleteClient(id: string) {
     this.check(await this.db.from("clients").delete().eq("id", id));
@@ -98,7 +100,7 @@ class MemoryStore implements Store {
       return existing;
     }
     const created: Client = {
-      id: crypto.randomUUID(), company_type: "roofing", active: true, ghl_location_id: "", ghl_token: null, target_zips: [],
+      id: crypto.randomUUID(), company_type: "roofing", status: "active", ghl_location_id: "", ghl_token: null, target_zips: [],
       areas: [], incomplete_as: "review", min_sqft: null,
       max_sqft: null, min_roof_sqft: null, max_roof_sqft: null, allowed_property_types: [], notes: null, last_synced_at: null, last_sync_error: null,
       created_at: new Date().toISOString(), ...c,

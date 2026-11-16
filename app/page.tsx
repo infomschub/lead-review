@@ -1,42 +1,56 @@
 import Link from "next/link";
 import { store } from "@/lib/store";
-import { COMPANY_LABEL } from "@/lib/types";
+import { CLIENT_STATUSES, COMPANY_LABEL, statusOf } from "@/lib/types";
 import { tally, pct, fmtMinutes } from "@/lib/stats";
-import { TallyTiles, QualityBar, RangeTabs, timeAgo } from "@/components/ui";
+import { QualityBar, RangeTabs, timeAgo } from "@/components/ui";
 import { SyncButton } from "@/components/SyncButton";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-export default async function Overview({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
-  const days = [7, 14, 30].includes(Number((await searchParams).days)) ? Number((await searchParams).days) : 7;
+export default async function Overview({ searchParams }: { searchParams: Promise<{ days?: string; status?: string }> }) {
+  const sp = await searchParams;
+  const days = [7, 14, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
+  const status = statusOf(sp.status);
+  const label = CLIENT_STATUSES.find((x) => x.key === status)!.label;
   const since = new Date(Date.now() - days * 864e5).toISOString();
   const s = store();
   const [clients, leads] = await Promise.all([s.listClients(), s.listLeads(null, since)]);
-  const active = clients.filter((c) => c.active);
-  const rows = active
+  const rows = clients
+    .filter((c) => (c.status ?? "active") === status)
     .map((c) => ({ c, t: tally(leads.filter((l) => l.client_id === c.id)) }))
     .sort((a, b) => b.t.total - a.t.total);
-  const all = tally(leads.filter((l) => active.some((c) => c.id === l.client_id)));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">All active clients</h1>
-          <p className="text-sm text-stone-500">Leads from the last {days} days. Checked automatically every Monday at 7:00 AM (PHT).</p>
+          <h1 className="text-2xl font-semibold">{label} clients</h1>
+          <p className="text-sm text-stone-500">
+            Each client&apos;s leads from the last {days} days.{" "}
+            {status === "active" ? "Checked automatically every Monday at 7:00 AM (PHT)." : "Not synced while " + status + "."}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <RangeTabs days={days} base="/" />
-          <SyncButton label="Sync all" />
+          <div className="inline-flex rounded-lg border border-stone-300 bg-white p-0.5 text-sm">
+            {CLIENT_STATUSES.map((x) => (
+              <Link
+                key={x.key}
+                href={`/?status=${x.key}&days=${days}`}
+                className={`rounded-md px-3 py-1 ${x.key === status ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"}`}
+              >
+                {x.label}
+              </Link>
+            ))}
+          </div>
+          <RangeTabs days={days} base="/" extra={`status=${status}`} />
+          {status === "active" && <SyncButton label="Sync all" />}
         </div>
       </div>
 
-      <TallyTiles t={all} />
-
       {rows.length === 0 ? (
         <div className="card py-12 text-center">
-          <p className="font-medium">No active clients yet</p>
+          <p className="font-medium">No {status} clients</p>
           <p className="mt-1 text-sm text-stone-500">Add a client and set their targeting to start reviewing leads.</p>
           <Link href="/clients/new" className="btn-primary mt-4">+ Add client</Link>
         </div>
@@ -81,14 +95,6 @@ export default async function Overview({ searchParams }: { searchParams: Promise
             </tbody>
           </table>
         </div>
-      )}
-      {clients.length > active.length && (
-        <p className="text-sm text-stone-500">
-          {clients.length - active.length} inactive client(s) hidden:{" "}
-          {clients.filter((c) => !c.active).map((c, i) => (
-            <span key={c.id}>{i > 0 && ", "}<Link className="underline" href={`/clients/${c.id}`}>{c.name}</Link></span>
-          ))}
-        </p>
       )}
     </div>
   );

@@ -11,6 +11,14 @@ export const sizeLabel = (t: CompanyType) => (t === "roofing" ? "Roof size" : t 
 export const checksRoof = (t: CompanyType) => t !== "home_improvement";
 export const checksHome = (t: CompanyType) => t !== "roofing";
 
+export type ClientStatus = "active" | "paused" | "lost";
+export const CLIENT_STATUSES: { key: ClientStatus; label: string }[] = [
+  { key: "active", label: "Active" },
+  { key: "paused", label: "Paused" },
+  { key: "lost", label: "Lost" },
+];
+export const statusOf = (v: unknown): ClientStatus => (v === "paused" || v === "lost" ? v : "active");
+
 export const PROPERTY_TYPES = [
   "Single Family",
   "Townhouse",
@@ -26,7 +34,8 @@ export interface Client {
   id: string;
   name: string;
   company_type: CompanyType;
-  active: boolean;
+  /** active = synced every Monday. paused / lost = kept for history, not synced. */
+  status: ClientStatus;
   /** GHL sub-account (location) ID. */
   ghl_location_id: string;
   /** GHL Private Integration token for that sub-account. Never sent to the browser. */

@@ -8,7 +8,7 @@ import { syncAll, syncClient } from "@/lib/sync";
 import { geocode, lastGeocodeError, parseLatLng } from "@/lib/property";
 import { testConnection } from "@/lib/ghl";
 import { gradeLead } from "@/lib/grade";
-import type { Area, Client, CompanyType, Grade } from "@/lib/types";
+import { statusOf, type Area, type Client, type CompanyType, type Grade } from "@/lib/types";
 
 export async function login(formData: FormData) {
   const pw = String(formData.get("password") ?? "");
@@ -61,7 +61,7 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
     ...(id ? { id } : {}),
     name,
     company_type,
-    active: formData.get("active") === "on",
+    status: statusOf(formData.get("status")),
     ghl_location_id: String(formData.get("ghl_location_id") ?? "").trim(),
     // Blank token field on edit = keep the saved one.
     ghl_token: tokenIn || prev?.ghl_token || null,
@@ -84,13 +84,13 @@ export async function saveClient(_: unknown, formData: FormData): Promise<{ erro
   const leads = await s.listLeads(saved.id, new Date(Date.now() - 90 * 864e5).toISOString());
   for (const l of leads) await s.updateLead(l.id, gradeLead(saved, l));
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   redirect(`/clients/${saved.id}`);
 }
 
 export async function deleteClient(formData: FormData) {
   await store().deleteClient(String(formData.get("id")));
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   redirect("/");
 }
 

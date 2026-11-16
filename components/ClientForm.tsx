@@ -35,10 +35,14 @@ export function ClientForm({ client }: { client?: SafeClient }) {
             <label className="label" htmlFor="name">Client name</label>
             <input id="name" name="name" className="input" defaultValue={client?.name} required />
           </div>
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" name="active" defaultChecked={client?.active ?? true} className="h-4 w-4" />
-            Active (checked every Monday and shown on the overview)
-          </label>
+          <div>
+            <label className="label" htmlFor="status">Status</label>
+            <select id="status" name="status" className="input" defaultValue={client?.status ?? "active"}>
+              <option value="active">Active (leads checked every Monday)</option>
+              <option value="paused">Paused (not synced, history kept)</option>
+              <option value="lost">Lost (not synced, history kept)</option>
+            </select>
+          </div>
         </div>
         <fieldset>
           <legend className="label">Company type</legend>

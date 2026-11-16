@@ -48,10 +48,16 @@ export default async function ClientPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href={`/?days=${days}`} className="text-sm text-stone-500 hover:underline">← All clients</Link>
+          <Link href={`/?status=${client.status ?? "active"}&days=${days}`} className="text-sm text-stone-500 hover:underline">
+            ← All {client.status ?? "active"} clients
+          </Link>
           <h1 className="mt-1 text-2xl font-semibold">
             {client.name}
-            {!client.active && <span className="pill ml-2 bg-stone-200 align-middle text-stone-600">Inactive</span>}
+            {client.status !== "active" && (
+              <span className={`pill ml-2 align-middle ${client.status === "lost" ? "bg-red-100 text-red-700" : "bg-stone-200 text-stone-600"}`}>
+                {client.status === "lost" ? "Lost" : "Paused"}
+              </span>
+            )}
           </h1>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {targetingSummary(client).map((p) => (

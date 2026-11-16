@@ -14,7 +14,7 @@ const LAST = ["Johnson", "Garcia", "Miller", "Davis", "Martinez", "Wilson", "And
 const STREETS = ["Maple Ave", "Oak St", "Cedar Ln", "Pine Ridge Dr", "Willow Ct", "Elm St", "Lakeview Dr", "Sunset Blvd", "Hillcrest Rd", "Meadow Way", "Birch St", "Park Ave"];
 
 const base = {
-  active: true, ghl_token: null, notes: null, last_sync_error: null, incomplete_as: "review" as const,
+  status: "active" as const, ghl_token: null, notes: null, last_sync_error: null, incomplete_as: "review" as const,
   allowed_property_types: ["Single Family", "Townhouse"],
 };
 
@@ -35,7 +35,7 @@ export function demoData(): { clients: Client[]; leads: Lead[] } {
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 60 * 864e5).toISOString(),
     },
     {
-      ...base, id: "demo-prairie", name: "Prairie Roofing & Gutters", company_type: "roofing", ghl_location_id: "demo-loc-3",
+      ...base, id: "demo-prairie", name: "Prairie Roofing & Gutters", company_type: "roofing", status: "paused", ghl_location_id: "demo-loc-3",
       areas: [{ label: "Omaha, NE", lat: 41.2565, lng: -95.9345, radius_miles: 40 }],
       target_zips: [], min_sqft: null, max_sqft: null, min_roof_sqft: 1400, max_roof_sqft: null, allowed_property_types: [],
       last_synced_at: new Date(now - 3 * 36e5).toISOString(), created_at: new Date(now - 30 * 864e5).toISOString(),

@@ -5,6 +5,7 @@ create table if not exists clients (
   name text not null,
   company_type text not null default 'roofing' check (company_type in ('roofing','home_improvement','both')),
   active boolean not null default true,
+  status text not null default 'active' check (status in ('active','paused','lost')),
   ghl_location_id text not null default '',
   ghl_token text,
   target_zips text[] not null default '{}',
